@@ -9,6 +9,8 @@ nopeutus, hidastus, käänteiset ohjaimet, ruudun heilunta tai värien väärist
 Kerätyt efektit jonoutuvat ja aktivoituvat peräkkäin.
 Jokainen keräys pienentää sinistä ympyrää ja kaikkia kerättäviä ympyröitä,
 kunnes ne saavuttavat pienen vähimmäiskoon.
+Jokainen keräys lisää harmaan neliöesteen, enintään kahdeksan. Esteiden läpi ei
+voi kulkea, ja kerättävät ympyrät sijoitetaan niiden ulkopuolelle.
 Sinisen ympyrän ilme muuttuu peliajan mukaan: 60–100 % `:D`, 40–59 % `:\`,
 10–39 % `:(` ja alle 10 % `x(`. Pelaajaympyrän minimikoko pitää ilmeen
 luettavana.

@@ -22,6 +22,8 @@
 #define COLLECTIBLE_RADIUS 8
 #define MIN_COLLECTIBLE_RADIUS 2
 #define MAX_CIRCLE_SHRINK (CIRCLE_RADIUS - MIN_PLAYER_RADIUS)
+#define MAX_OBSTACLES 8
+#define OBSTACLE_HALF_SIZE 8
 #define EFFECT_COUNT 5
 #define EFFECT_QUEUE_CAPACITY 8
 #define TIMER_BAR_X 8
@@ -49,6 +51,11 @@ typedef struct {
 	uint8_t green;
 	uint8_t blue;
 } Collectible;
+
+typedef struct {
+	int x;
+	int y;
+} Obstacle;
 
 static FrameBuffer buffers[2];
 static uint8_t pad_buffers[2][34];
@@ -91,6 +98,107 @@ static int stick_direction(int value, int center) {
 static int get_circle_radius(int base_radius, int shrink_steps, int minimum) {
 	int radius = base_radius - shrink_steps;
 	return radius < minimum ? minimum : radius;
+}
+
+static int circle_overlaps_obstacle(
+	int circle_x,
+	int circle_y,
+	int circle_radius,
+	const Obstacle *obstacle,
+	int extra_clearance
+) {
+	int closest_x = circle_x;
+	int closest_y = circle_y;
+	int left = obstacle->x - OBSTACLE_HALF_SIZE - extra_clearance;
+	int right = obstacle->x + OBSTACLE_HALF_SIZE + extra_clearance;
+	int top = obstacle->y - OBSTACLE_HALF_SIZE - extra_clearance;
+	int bottom = obstacle->y + OBSTACLE_HALF_SIZE + extra_clearance;
+
+	if (closest_x < left)
+		closest_x = left;
+	else if (closest_x > right)
+		closest_x = right;
+	if (closest_y < top)
+		closest_y = top;
+	else if (closest_y > bottom)
+		closest_y = bottom;
+
+	int dx = circle_x - closest_x;
+	int dy = circle_y - closest_y;
+	return dx * dx + dy * dy < circle_radius * circle_radius;
+}
+
+static int position_blocked(
+	int x,
+	int y,
+	int radius,
+	const Obstacle obstacles[MAX_OBSTACLES],
+	int obstacle_count
+) {
+	for (int i = 0; i < obstacle_count; i++) {
+		if (circle_overlaps_obstacle(x, y, radius, &obstacles[i], 0))
+			return 1;
+	}
+	return 0;
+}
+
+static int spawn_obstacle(
+	Obstacle obstacles[MAX_OBSTACLES],
+	int *obstacle_count,
+	int player_x,
+	int player_y,
+	int player_radius,
+	const Collectible collectibles[COLLECTIBLE_COUNT],
+	int collectible_radius
+) {
+	if (*obstacle_count >= MAX_OBSTACLES)
+		return 0;
+
+	for (int attempt = 0; attempt < 128; attempt++) {
+		Obstacle candidate = {
+			.x = PLATFORM_LEFT + OBSTACLE_HALF_SIZE +
+				rand() % (PLATFORM_RIGHT - PLATFORM_LEFT -
+					2 * OBSTACLE_HALF_SIZE + 1),
+			.y = PLATFORM_TOP + OBSTACLE_HALF_SIZE +
+				rand() % (PLATFORM_BOTTOM - PLATFORM_TOP -
+					2 * OBSTACLE_HALF_SIZE + 1)
+		};
+		int safe = !circle_overlaps_obstacle(
+			player_x,
+			player_y,
+			player_radius + 8,
+			&candidate,
+			0
+		);
+
+		for (int i = 0; safe && i < COLLECTIBLE_COUNT; i++) {
+			if (circle_overlaps_obstacle(
+				collectibles[i].x,
+				collectibles[i].y,
+				collectible_radius + 4,
+				&candidate,
+				0
+			))
+				safe = 0;
+		}
+
+		for (int i = 0; safe && i < *obstacle_count; i++) {
+			int dx = candidate.x - obstacles[i].x;
+			int dy = candidate.y - obstacles[i].y;
+			int minimum_distance = 2 * OBSTACLE_HALF_SIZE + 6;
+			if (dx > -minimum_distance && dx < minimum_distance &&
+				dy > -minimum_distance && dy < minimum_distance)
+				safe = 0;
+		}
+
+		if (safe) {
+			obstacles[*obstacle_count] = candidate;
+			(*obstacle_count)++;
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 static uint8_t *draw_face_rect(
@@ -379,6 +487,35 @@ static uint8_t *draw_platform(
 	return packet + sizeof(POLY_F4);
 }
 
+static uint8_t *draw_obstacle(
+	uint8_t *packet,
+	uint32_t *ordering_table,
+	const Obstacle *obstacle,
+	int offset_x,
+	int offset_y,
+	int color_filter
+) {
+	POLY_F4 *square = (POLY_F4 *) packet;
+	int red = 145;
+	int green = 151;
+	int blue = 160;
+
+	apply_color_filter(&red, &green, &blue, color_filter);
+	setPolyF4(square);
+	setRGB0(square, red, green, blue);
+	square->x0 = (int16_t) (obstacle->x - OBSTACLE_HALF_SIZE + offset_x);
+	square->y0 = (int16_t) (obstacle->y - OBSTACLE_HALF_SIZE + offset_y);
+	square->x1 = (int16_t) (obstacle->x + OBSTACLE_HALF_SIZE + offset_x);
+	square->y1 = square->y0;
+	square->x2 = square->x0;
+	square->y2 = (int16_t) (obstacle->y + OBSTACLE_HALF_SIZE + offset_y);
+	square->x3 = square->x1;
+	square->y3 = square->y2;
+	addPrim(&ordering_table[1], square);
+
+	return packet + sizeof(POLY_F4);
+}
+
 static uint8_t *draw_circle(
 	uint8_t *packet,
 	uint32_t *ordering_table,
@@ -431,7 +568,9 @@ static void place_collectible(
 	int player_x,
 	int player_y,
 	int radius,
-	int player_radius
+	int player_radius,
+	const Obstacle obstacles[MAX_OBSTACLES],
+	int obstacle_count
 ) {
 	int safe = 0;
 
@@ -458,6 +597,17 @@ static void place_collectible(
 			int dy = collectible->y - collectibles[i].y;
 			int clearance = 2 * radius + 8;
 			if (dx * dx + dy * dy < clearance * clearance)
+				safe = 0;
+		}
+
+		for (int i = 0; safe && i < obstacle_count; i++) {
+			if (circle_overlaps_obstacle(
+				collectible->x,
+				collectible->y,
+				radius + 4,
+				&obstacles[i],
+				0
+			))
 				safe = 0;
 		}
 	}
@@ -510,6 +660,7 @@ int main(void) {
 	int stick_center_y = 128;
 	int game_started = 0;
 	int circle_shrink = 0;
+	int obstacle_count = 0;
 	int effect_type = -1;
 	int effect_frames = 0;
 	int effect_queue[EFFECT_QUEUE_CAPACITY];
@@ -526,6 +677,7 @@ int main(void) {
 	char time_status[24];
 	char queue_status[48];
 	Collectible collectibles[COLLECTIBLE_COUNT] = { 0 };
+	Obstacle obstacles[MAX_OBSTACLES] = { 0 };
 
 	srand(VSync(-1));
 	for (int i = 0; i < COLLECTIBLE_COUNT; i++)
@@ -536,7 +688,9 @@ int main(void) {
 			player_x,
 			player_y,
 			COLLECTIBLE_RADIUS,
-			CIRCLE_RADIUS
+			CIRCLE_RADIUS,
+			obstacles,
+			obstacle_count
 		);
 
 	for (;;) {
@@ -563,6 +717,7 @@ int main(void) {
 			player_y = (PLATFORM_TOP + PLATFORM_BOTTOM) / 2;
 			game_started = 0;
 			circle_shrink = 0;
+			obstacle_count = 0;
 			effect_type = -1;
 			effect_frames = 0;
 			queue_head = 0;
@@ -582,7 +737,9 @@ int main(void) {
 					player_x,
 					player_y,
 					COLLECTIBLE_RADIUS,
-					CIRCLE_RADIUS
+					CIRCLE_RADIUS,
+					obstacles,
+					obstacle_count
 				);
 		}
 
@@ -659,17 +816,25 @@ int main(void) {
 		int collectible_radius = get_circle_radius(
 			COLLECTIBLE_RADIUS, circle_shrink, MIN_COLLECTIBLE_RADIUS
 		);
-		player_x += move_x;
-		player_y += move_y;
+		int next_x = player_x + move_x;
+		if (next_x < PLATFORM_LEFT + player_radius)
+			next_x = PLATFORM_LEFT + player_radius;
+		if (next_x > PLATFORM_RIGHT - player_radius)
+			next_x = PLATFORM_RIGHT - player_radius;
+		if (!position_blocked(
+			next_x, player_y, player_radius, obstacles, obstacle_count
+		))
+			player_x = next_x;
 
-		if (player_x < PLATFORM_LEFT + player_radius)
-			player_x = PLATFORM_LEFT + player_radius;
-		if (player_x > PLATFORM_RIGHT - player_radius)
-			player_x = PLATFORM_RIGHT - player_radius;
-		if (player_y < PLATFORM_TOP + player_radius)
-			player_y = PLATFORM_TOP + player_radius;
-		if (player_y > PLATFORM_BOTTOM - player_radius)
-			player_y = PLATFORM_BOTTOM - player_radius;
+		int next_y = player_y + move_y;
+		if (next_y < PLATFORM_TOP + player_radius)
+			next_y = PLATFORM_TOP + player_radius;
+		if (next_y > PLATFORM_BOTTOM - player_radius)
+			next_y = PLATFORM_BOTTOM - player_radius;
+		if (!position_blocked(
+			player_x, next_y, player_radius, obstacles, obstacle_count
+		))
+			player_y = next_y;
 
 		for (int i = 0; i < COLLECTIBLE_COUNT; i++) {
 			int dx = player_x - collectibles[i].x;
@@ -703,6 +868,15 @@ int main(void) {
 					player_y = PLATFORM_TOP + player_radius;
 				if (player_y > PLATFORM_BOTTOM - player_radius)
 					player_y = PLATFORM_BOTTOM - player_radius;
+				spawn_obstacle(
+					obstacles,
+					&obstacle_count,
+					player_x,
+					player_y,
+					player_radius,
+					collectibles,
+					collectible_radius
+				);
 				place_collectible(
 					&collectibles[i],
 					collectibles,
@@ -710,7 +884,9 @@ int main(void) {
 					player_x,
 					player_y,
 					collectible_radius,
-					player_radius
+					player_radius,
+					obstacles,
+					obstacle_count
 				);
 			}
 		}
@@ -780,6 +956,15 @@ int main(void) {
 			shake_y,
 			color_filter
 		);
+		for (int i = 0; i < obstacle_count; i++)
+			packet = draw_obstacle(
+				packet,
+				draw_buffer->ordering_table,
+				&obstacles[i],
+				shake_x,
+				shake_y,
+				color_filter
+			);
 		for (int i = 0; i < COLLECTIBLE_COUNT; i++) {
 			packet = draw_player_face(
 				packet,

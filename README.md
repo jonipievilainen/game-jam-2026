@@ -60,6 +60,9 @@ projektiin.
   järjestyksessä; käynnissä oleva efekti ei korvaudu uudella.
 - Jokainen keräys pienentää kaikkia ympyröitä. Koot pienenevät vähimmäiskokoon
   asti, jotta ympyrät pysyvät näkyvinä ja kerättävinä.
+- Jokainen keräys lisää alustalle harmaan neliöesteen, enintään kahdeksan.
+  Esteiden läpi ei voi liikkua, mutta ympyrää voi liu'uttaa esteen reunaa
+  pitkin. Esteet eivät ilmesty pelaajan tai kerättävien ympyröiden päälle.
 - Sinisen ympyrän naama näyttää jäljellä olevan peliajan: 60–100 % `:D`,
   40–59 % `:\`, 10–39 % `:(` ja alle 10 % `x(`. Pelaajaympyrän vähimmäiskoko
   pitää ilmeet luettavina pienentymisen jälkeenkin.
