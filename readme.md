@@ -1,8 +1,11 @@
-# Playstation 1 peli.
+# PlayStation 1 - 2D-peli
 
-## Kartta
-Pelissä ollaan labyrinttimaisessa ympäristössä, mikä on 3D.
+Ohjaa ympyrää alustalla PlayStation-ohjaimen ristiohjaimella tai DuckStationiin
+määritetyillä näppäimillä.
 
-## Pelihahmo
-Pelihahmoa katsotaan kolmannesta persoonasta ja liikutellaan ohjaimen nuolinäppäimin.
+Käännä ja käynnistä peli projektin kansiosta:
 
+```bash
+./build.sh
+~/.local/opt/duckstation/DuckStation-x64.AppImage build/hello.cue
+```

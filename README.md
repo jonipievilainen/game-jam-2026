@@ -1,8 +1,8 @@
-# Hello World – PlayStation 1
+# PlayStation 1 - 2D
 
-Yksinkertainen PS1:n kolmannen persoonan peli PSn00bSDK:lla. Ohjattava palikka
-liikkuu tasaisella kentällä, ja kameraa voi kiertää palikan ympärillä.
-Käännös tuottaa PS-X EXE -tiedoston ja käynnistettävän CD-kuvan.
+Yksinkertainen 2D-peli PlayStation 1:lle ja PSn00bSDK:lle. Ohjaimen ristiohjain
+liikuttaa ympyrää alustalla. Käännös tuottaa PS-X EXE -tiedoston ja
+käynnistettävän CD-kuvan.
 
 ## Ympäristön asennus Linux Mintissä
 
@@ -49,11 +49,9 @@ projektiin.
 
 ## Ohjaimet
 
-- Vasen tatti liikuttaa hahmoa suhteessa kameran suuntaan.
-- Oikea tatti kiertää kameraa hahmon ympärillä ja muuttaa kuvakulman korkeutta.
+- Ohjaimen ristiohjain liikuttaa ympyrää alustalla.
 
-Peli tarvitsee analogisen ohjaimen, kuten DualShockin. Näppäinohjaimella tai
-digitaalisella ohjaimella analogiset liikkeet eivät ole käytettävissä.
+Ympyrää voi liikuttaa myös DuckStationiin määritetyillä ristiohjaimen näppäimillä.
 
 ## Run and Debug VS Codessa
 
