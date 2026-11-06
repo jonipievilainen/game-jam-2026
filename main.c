@@ -14,11 +14,14 @@
 #define PLATFORM_RIGHT 296
 #define PLATFORM_BOTTOM 224
 #define CIRCLE_RADIUS 14
+#define MIN_PLAYER_RADIUS 3
 #define PLAYER_SPEED 2
 #define STICK_DEADZONE 28
 #define STICK_CALIBRATION_SAMPLES 16
 #define COLLECTIBLE_COUNT 4
 #define COLLECTIBLE_RADIUS 8
+#define MIN_COLLECTIBLE_RADIUS 2
+#define MAX_CIRCLE_SHRINK (CIRCLE_RADIUS - MIN_PLAYER_RADIUS)
 #define EFFECT_COUNT 5
 #define EFFECT_QUEUE_CAPACITY 8
 #define TIMER_BAR_X 8
@@ -83,6 +86,11 @@ static int stick_direction(int value, int center) {
 	if (offset > 0)
 		return offset > 72 ? PLAYER_SPEED : 1;
 	return offset < -72 ? -PLAYER_SPEED : -1;
+}
+
+static int get_circle_radius(int base_radius, int shrink_steps, int minimum) {
+	int radius = base_radius - shrink_steps;
+	return radius < minimum ? minimum : radius;
 }
 
 static uint8_t *draw_bar(
@@ -238,22 +246,26 @@ static void place_collectible(
 	const Collectible collectibles[COLLECTIBLE_COUNT],
 	int index,
 	int player_x,
-	int player_y
+	int player_y,
+	int radius,
+	int player_radius
 ) {
 	int safe = 0;
 
 	while (!safe) {
 		safe = 1;
-		collectible->x = PLATFORM_LEFT + COLLECTIBLE_RADIUS +
+		collectible->x = PLATFORM_LEFT + radius +
 			rand() % (PLATFORM_RIGHT - PLATFORM_LEFT -
-				2 * COLLECTIBLE_RADIUS + 1);
-		collectible->y = PLATFORM_TOP + COLLECTIBLE_RADIUS +
+				2 * radius + 1);
+		collectible->y = PLATFORM_TOP + radius +
 			rand() % (PLATFORM_BOTTOM - PLATFORM_TOP -
-				2 * COLLECTIBLE_RADIUS + 1);
+				2 * radius + 1);
 
 		int player_dx = collectible->x - player_x;
 		int player_dy = collectible->y - player_y;
-		if (player_dx * player_dx + player_dy * player_dy < 40 * 40)
+		int player_clearance = radius + player_radius + 18;
+		if (player_dx * player_dx + player_dy * player_dy <
+			player_clearance * player_clearance)
 			safe = 0;
 
 		for (int i = 0; safe && i < COLLECTIBLE_COUNT; i++) {
@@ -261,7 +273,8 @@ static void place_collectible(
 				continue;
 			int dx = collectible->x - collectibles[i].x;
 			int dy = collectible->y - collectibles[i].y;
-			if (dx * dx + dy * dy < 24 * 24)
+			int clearance = 2 * radius + 8;
+			if (dx * dx + dy * dy < clearance * clearance)
 				safe = 0;
 		}
 	}
@@ -313,6 +326,7 @@ int main(void) {
 	int stick_center_x = 128;
 	int stick_center_y = 128;
 	int game_started = 0;
+	int circle_shrink = 0;
 	int effect_type = -1;
 	int effect_frames = 0;
 	int effect_queue[EFFECT_QUEUE_CAPACITY];
@@ -333,7 +347,13 @@ int main(void) {
 	srand(VSync(-1));
 	for (int i = 0; i < COLLECTIBLE_COUNT; i++)
 		place_collectible(
-			&collectibles[i], collectibles, i, player_x, player_y
+			&collectibles[i],
+			collectibles,
+			i,
+			player_x,
+			player_y,
+			COLLECTIBLE_RADIUS,
+			CIRCLE_RADIUS
 		);
 
 	for (;;) {
@@ -422,22 +442,28 @@ int main(void) {
 			}
 		}
 
+		int player_radius = get_circle_radius(
+			CIRCLE_RADIUS, circle_shrink, MIN_PLAYER_RADIUS
+		);
+		int collectible_radius = get_circle_radius(
+			COLLECTIBLE_RADIUS, circle_shrink, MIN_COLLECTIBLE_RADIUS
+		);
 		player_x += move_x;
 		player_y += move_y;
 
-		if (player_x < PLATFORM_LEFT + CIRCLE_RADIUS)
-			player_x = PLATFORM_LEFT + CIRCLE_RADIUS;
-		if (player_x > PLATFORM_RIGHT - CIRCLE_RADIUS)
-			player_x = PLATFORM_RIGHT - CIRCLE_RADIUS;
-		if (player_y < PLATFORM_TOP + CIRCLE_RADIUS)
-			player_y = PLATFORM_TOP + CIRCLE_RADIUS;
-		if (player_y > PLATFORM_BOTTOM - CIRCLE_RADIUS)
-			player_y = PLATFORM_BOTTOM - CIRCLE_RADIUS;
+		if (player_x < PLATFORM_LEFT + player_radius)
+			player_x = PLATFORM_LEFT + player_radius;
+		if (player_x > PLATFORM_RIGHT - player_radius)
+			player_x = PLATFORM_RIGHT - player_radius;
+		if (player_y < PLATFORM_TOP + player_radius)
+			player_y = PLATFORM_TOP + player_radius;
+		if (player_y > PLATFORM_BOTTOM - player_radius)
+			player_y = PLATFORM_BOTTOM - player_radius;
 
 		for (int i = 0; i < COLLECTIBLE_COUNT; i++) {
 			int dx = player_x - collectibles[i].x;
 			int dy = player_y - collectibles[i].y;
-			int collision_distance = CIRCLE_RADIUS + COLLECTIBLE_RADIUS;
+			int collision_distance = player_radius + collectible_radius;
 			if (dx * dx + dy * dy <=
 				collision_distance * collision_distance &&
 				queue_count < EFFECT_QUEUE_CAPACITY &&
@@ -448,8 +474,32 @@ int main(void) {
 				queue_count++;
 				game_time_frames += effect_duration;
 				game_started = 1;
+				if (circle_shrink < MAX_CIRCLE_SHRINK)
+					circle_shrink++;
+				player_radius = get_circle_radius(
+					CIRCLE_RADIUS, circle_shrink, MIN_PLAYER_RADIUS
+				);
+				collectible_radius = get_circle_radius(
+					COLLECTIBLE_RADIUS,
+					circle_shrink,
+					MIN_COLLECTIBLE_RADIUS
+				);
+				if (player_x < PLATFORM_LEFT + player_radius)
+					player_x = PLATFORM_LEFT + player_radius;
+				if (player_x > PLATFORM_RIGHT - player_radius)
+					player_x = PLATFORM_RIGHT - player_radius;
+				if (player_y < PLATFORM_TOP + player_radius)
+					player_y = PLATFORM_TOP + player_radius;
+				if (player_y > PLATFORM_BOTTOM - player_radius)
+					player_y = PLATFORM_BOTTOM - player_radius;
 				place_collectible(
-					&collectibles[i], collectibles, i, player_x, player_y
+					&collectibles[i],
+					collectibles,
+					i,
+					player_x,
+					player_y,
+					collectible_radius,
+					player_radius
 				);
 			}
 		}
@@ -513,7 +563,11 @@ int main(void) {
 				draw_buffer->ordering_table,
 				collectibles[i].x,
 				collectibles[i].y,
-				COLLECTIBLE_RADIUS,
+				get_circle_radius(
+					COLLECTIBLE_RADIUS,
+					circle_shrink,
+					MIN_COLLECTIBLE_RADIUS
+				),
 				collectibles[i].red,
 				collectibles[i].green,
 				collectibles[i].blue,
@@ -527,7 +581,9 @@ int main(void) {
 			draw_buffer->ordering_table,
 			player_x,
 			player_y,
-			CIRCLE_RADIUS,
+			get_circle_radius(
+				CIRCLE_RADIUS, circle_shrink, MIN_PLAYER_RADIUS
+			),
 			70,
 			190,
 			245,

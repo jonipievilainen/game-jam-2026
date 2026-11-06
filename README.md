@@ -58,6 +58,8 @@ projektiin.
   sekunnin efektin: nopeutuksen, hidastuksen, käänteiset ohjaimet, ruudun
   heilunnan tai värien vääristymisen. Efektit jonoutuvat ja aktivoituvat
   järjestyksessä; käynnissä oleva efekti ei korvaudu uudella.
+- Jokainen keräys pienentää kaikkia ympyröitä. Koot pienenevät vähimmäiskokoon
+  asti, jotta ympyrät pysyvät näkyvinä ja kerättävinä.
 - Ensimmäisen efektin kerääminen käynnistää kahden sekunnin peliajan. Jokainen
   uusi keräys lisää jäljellä olevaan aikaan kaksi sekuntia ja lisää efektin
   jonoon. Ylempi palkki näyttää yhteisen peliajan, alempi aktiivisen efektin
