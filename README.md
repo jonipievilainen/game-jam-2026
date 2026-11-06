@@ -53,8 +53,10 @@ projektiin.
 - Ohjaimen ristiohjain liikuttaa ympyrää alustalla.
 - Analogiohjaimen vasen tatti liikuttaa ympyrää. Tatti kalibroidaan automaattisesti
   ohjaimen kytkemisen jälkeen: pidä se keskellä kalibrointitekstin ajan.
-- Kerää värillisiä ympyröitä sinisellä ympyrällä. Saat satunnaisesti nopeutuksen,
-  hidastuksen tai käänteiset ohjaimet kahdeksi sekunniksi.
+- Kerää värillisiä ympyröitä sinisellä ympyrällä. Saat satunnaisen kahden
+  sekunnin efektin: nopeutuksen, hidastuksen, käänteiset ohjaimet, ruudun
+  heilunnan tai värien vääristymisen. Efektit jonoutuvat ja aktivoituvat
+  järjestyksessä; käynnissä oleva efekti ei korvaudu uudella.
 
 Ympyrää voi liikuttaa myös DuckStationiin määritetyillä ristiohjaimen näppäimillä.
 

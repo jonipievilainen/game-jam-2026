@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <psxapi.h>
 #include <psxgpu.h>
@@ -18,7 +19,16 @@
 #define STICK_CALIBRATION_SAMPLES 16
 #define COLLECTIBLE_COUNT 4
 #define COLLECTIBLE_RADIUS 8
-#define EFFECT_COUNT 3
+#define EFFECT_COUNT 5
+#define EFFECT_QUEUE_CAPACITY 8
+
+enum {
+	EFFECT_SPEED,
+	EFFECT_SLOW,
+	EFFECT_REVERSED,
+	EFFECT_SCREEN_SHAKE,
+	EFFECT_COLOR_GLITCH
+};
 
 typedef struct {
 	DISPENV display;
@@ -48,7 +58,9 @@ static const uint8_t collectible_colors[COLLECTIBLE_COUNT][3] = {
 static const char *const effect_names[EFFECT_COUNT] = {
 	"SPEED BOOST!",
 	"SLOW MOTION!",
-	"REVERSED CONTROLS!"
+	"REVERSED CONTROLS!",
+	"SCREEN SHAKE!",
+	"COLOR GLITCH!"
 };
 
 static const int8_t circle_offsets[16][2] = {
@@ -67,6 +79,20 @@ static int stick_direction(int value, int center) {
 	return offset < -72 ? -PLAYER_SPEED : -1;
 }
 
+static void apply_color_filter(
+	int *red,
+	int *green,
+	int *blue,
+	int color_filter
+) {
+	if (color_filter) {
+		int old_red = *red;
+		*red = *blue;
+		*blue = *green;
+		*green = old_red;
+	}
+}
+
 static void setup_buffers(void) {
 	for (int i = 0; i < 2; i++) {
 		int y = i * SCREEN_HEIGHT;
@@ -80,20 +106,27 @@ static void setup_buffers(void) {
 
 static uint8_t *draw_platform(
 	uint8_t *packet,
-	uint32_t *ordering_table
+	uint32_t *ordering_table,
+	int offset_x,
+	int offset_y,
+	int color_filter
 ) {
 	POLY_F4 *platform = (POLY_F4 *) packet;
+	int red = 66;
+	int green = 83;
+	int blue = 91;
 
 	setPolyF4(platform);
-	setRGB0(platform, 66, 83, 91);
-	platform->x0 = PLATFORM_LEFT;
-	platform->y0 = PLATFORM_TOP;
-	platform->x1 = PLATFORM_RIGHT;
-	platform->y1 = PLATFORM_TOP;
-	platform->x2 = PLATFORM_LEFT;
-	platform->y2 = PLATFORM_BOTTOM;
-	platform->x3 = PLATFORM_RIGHT;
-	platform->y3 = PLATFORM_BOTTOM;
+	apply_color_filter(&red, &green, &blue, color_filter);
+	setRGB0(platform, red, green, blue);
+	platform->x0 = PLATFORM_LEFT + offset_x;
+	platform->y0 = PLATFORM_TOP + offset_y;
+	platform->x1 = PLATFORM_RIGHT + offset_x;
+	platform->y1 = PLATFORM_TOP + offset_y;
+	platform->x2 = PLATFORM_LEFT + offset_x;
+	platform->y2 = PLATFORM_BOTTOM + offset_y;
+	platform->x3 = PLATFORM_RIGHT + offset_x;
+	platform->y3 = PLATFORM_BOTTOM + offset_y;
 	addPrim(&ordering_table[2], platform);
 
 	return packet + sizeof(POLY_F4);
@@ -107,27 +140,35 @@ static uint8_t *draw_circle(
 	int radius,
 	int red,
 	int green,
-	int blue
+	int blue,
+	int offset_x,
+	int offset_y,
+	int color_filter
 ) {
+	apply_color_filter(&red, &green, &blue, color_filter);
 	for (int i = 0; i < 16; i++) {
 		int next = (i + 1) & 15;
 		POLY_F3 *triangle = (POLY_F3 *) packet;
 
 		setPolyF3(triangle);
 		setRGB0(triangle, red, green, blue);
-		triangle->x0 = (int16_t) center_x;
-		triangle->y0 = (int16_t) center_y;
+		triangle->x0 = (int16_t) (center_x + offset_x);
+		triangle->y0 = (int16_t) (center_y + offset_y);
 		triangle->x1 = (int16_t) (
-			center_x + circle_offsets[i][0] * radius / CIRCLE_RADIUS
+			center_x + offset_x +
+			circle_offsets[i][0] * radius / CIRCLE_RADIUS
 		);
 		triangle->y1 = (int16_t) (
-			center_y + circle_offsets[i][1] * radius / CIRCLE_RADIUS
+			center_y + offset_y +
+			circle_offsets[i][1] * radius / CIRCLE_RADIUS
 		);
 		triangle->x2 = (int16_t) (
-			center_x + circle_offsets[next][0] * radius / CIRCLE_RADIUS
+			center_x + offset_x +
+			circle_offsets[next][0] * radius / CIRCLE_RADIUS
 		);
 		triangle->y2 = (int16_t) (
-			center_y + circle_offsets[next][1] * radius / CIRCLE_RADIUS
+			center_y + offset_y +
+			circle_offsets[next][1] * radius / CIRCLE_RADIUS
 		);
 		addPrim(&ordering_table[1], triangle);
 		packet += sizeof(POLY_F3);
@@ -174,6 +215,23 @@ static void place_collectible(
 	collectible->blue = collectible_colors[index][2];
 }
 
+static void start_next_effect(
+	const int effect_queue[EFFECT_QUEUE_CAPACITY],
+	int *queue_head,
+	int *queue_count,
+	int *effect_type,
+	int *effect_frames,
+	int effect_duration
+) {
+	if (*effect_frames || !*queue_count)
+		return;
+
+	*effect_type = effect_queue[*queue_head];
+	*queue_head = (*queue_head + 1) % EFFECT_QUEUE_CAPACITY;
+	(*queue_count)--;
+	*effect_frames = effect_duration;
+}
+
 int main(void) {
 	ResetGraph(0);
 	FntLoad(960, 0);
@@ -200,8 +258,12 @@ int main(void) {
 	int stick_center_y = 128;
 	int effect_type = -1;
 	int effect_frames = 0;
+	int effect_queue[EFFECT_QUEUE_CAPACITY];
+	int queue_head = 0;
+	int queue_count = 0;
 	int effect_duration =
 		GetVideoMode() == MODE_PAL ? 100 : 120;
+	char effect_status[48];
 	Collectible collectibles[COLLECTIBLE_COUNT] = { 0 };
 
 	srand(VSync(-1));
@@ -227,6 +289,15 @@ int main(void) {
 			pad_ready &&
 			(pad->type == PAD_ID_ANALOG ||
 			 pad->type == PAD_ID_ANALOG_STICK);
+
+		start_next_effect(
+			effect_queue,
+			&queue_head,
+			&queue_count,
+			&effect_type,
+			&effect_frames,
+			effect_duration
+		);
 
 		if (pad_ready && pad->type != controller_type) {
 			controller_type = pad->type;
@@ -267,15 +338,15 @@ int main(void) {
 			move_y = stick_direction(pad->ls_y, stick_center_y);
 
 		if (effect_frames > 0) {
-			if (effect_type == 0) {
+			if (effect_type == EFFECT_SPEED) {
 				move_x *= 2;
 				move_y *= 2;
-			} else if (effect_type == 1) {
+			} else if (effect_type == EFFECT_SLOW) {
 				if (move_x)
 					move_x = move_x > 0 ? 1 : -1;
 				if (move_y)
 					move_y = move_y > 0 ? 1 : -1;
-			} else if (effect_type == 2) {
+			} else if (effect_type == EFFECT_REVERSED) {
 				move_x = -move_x;
 				move_y = -move_y;
 			}
@@ -298,17 +369,52 @@ int main(void) {
 			int dy = player_y - collectibles[i].y;
 			int collision_distance = CIRCLE_RADIUS + COLLECTIBLE_RADIUS;
 			if (dx * dx + dy * dy <=
-				collision_distance * collision_distance) {
-				effect_type = rand() % EFFECT_COUNT;
-				effect_frames = effect_duration;
+				collision_distance * collision_distance &&
+				queue_count < EFFECT_QUEUE_CAPACITY) {
+				int queue_tail =
+					(queue_head + queue_count) % EFFECT_QUEUE_CAPACITY;
+				effect_queue[queue_tail] = rand() % EFFECT_COUNT;
+				queue_count++;
 				place_collectible(
 					&collectibles[i], collectibles, i, player_x, player_y
 				);
 			}
 		}
 
+		start_next_effect(
+			effect_queue,
+			&queue_head,
+			&queue_count,
+			&effect_type,
+			&effect_frames,
+			effect_duration
+		);
+
 		ClearOTagR(draw_buffer->ordering_table, OT_LENGTH);
-		packet = draw_platform(packet, draw_buffer->ordering_table);
+		int color_filter = effect_frames > 0 &&
+			effect_type == EFFECT_COLOR_GLITCH;
+		int shake_x = effect_frames > 0 &&
+			effect_type == EFFECT_SCREEN_SHAKE
+			? ((VSync(-1) & 4) ? 3 : -3)
+			: 0;
+		int shake_y = effect_frames > 0 &&
+			effect_type == EFFECT_SCREEN_SHAKE
+			? ((VSync(-1) & 2) ? 2 : -2)
+			: 0;
+
+		setRGB0(
+			&draw_buffer->draw,
+			color_filter ? 38 : 18,
+			color_filter ? 18 : 24,
+			color_filter ? 24 : 38
+		);
+		packet = draw_platform(
+			packet,
+			draw_buffer->ordering_table,
+			shake_x,
+			shake_y,
+			color_filter
+		);
 		for (int i = 0; i < COLLECTIBLE_COUNT; i++) {
 			packet = draw_circle(
 				packet,
@@ -318,7 +424,10 @@ int main(void) {
 				COLLECTIBLE_RADIUS,
 				collectibles[i].red,
 				collectibles[i].green,
-				collectibles[i].blue
+				collectibles[i].blue,
+				shake_x,
+				shake_y,
+				color_filter
 			);
 		}
 		packet = draw_circle(
@@ -329,21 +438,58 @@ int main(void) {
 			CIRCLE_RADIUS,
 			70,
 			190,
-			245
+			245,
+			shake_x,
+			shake_y,
+			color_filter
 		);
+		if (effect_frames > 0 && queue_count > 0) {
+			snprintf(
+				effect_status,
+				sizeof(effect_status),
+				"%s  QUEUED: %d",
+				effect_names[effect_type],
+				queue_count
+			);
+		} else if (effect_frames > 0) {
+			snprintf(
+				effect_status,
+				sizeof(effect_status),
+				"%s",
+				effect_names[effect_type]
+			);
+		} else if (queue_count > 0) {
+			snprintf(
+				effect_status,
+				sizeof(effect_status),
+				"EFFECTS QUEUED: %d",
+				queue_count
+			);
+		} else if (!pad_ready) {
+			snprintf(effect_status, sizeof(effect_status), "CONNECT CONTROLLER");
+		} else if (
+			analog_pad &&
+			calibration_samples < STICK_CALIBRATION_SAMPLES
+		) {
+			snprintf(
+				effect_status,
+				sizeof(effect_status),
+				"CENTER STICK TO CALIBRATE"
+			);
+		} else {
+			snprintf(
+				effect_status,
+				sizeof(effect_status),
+				"COLLECT COLORED CIRCLES!"
+			);
+		}
+
 		FntSort(
 			&draw_buffer->ordering_table[0],
 			packet,
 			8,
 			20,
-			effect_frames > 0
-				? effect_names[effect_type]
-				: !pad_ready
-					? "CONNECT CONTROLLER"
-					: analog_pad &&
-						calibration_samples < STICK_CALIBRATION_SAMPLES
-						? "CENTER STICK TO CALIBRATE"
-						: "COLLECT COLORED CIRCLES!"
+			effect_status
 		);
 
 		DrawSync(0);

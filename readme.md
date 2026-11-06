@@ -4,8 +4,9 @@ Ohjaa ympyrää PlayStation-ohjaimen ristiohjaimella tai vasemmalla tatilla.
 Tatti kalibroidaan automaattisesti ohjaimen kytkemisen jälkeen; pidä se keskellä
 kalibrointitekstin näkyessä. Ristiohjain ei tarvitse kalibrointia.
 
-Kerää värillisiä ympyröitä. Jokainen antaa satunnaisen nopeus-, hidastus- tai
-ohjaussuunnan kääntöefektin kahdeksi sekunniksi.
+Kerää värillisiä ympyröitä. Jokainen antaa satunnaisen kahden sekunnin efektin:
+nopeutus, hidastus, käänteiset ohjaimet, ruudun heilunta tai värien vääristymä.
+Kerätyt efektit jonoutuvat ja aktivoituvat peräkkäin.
 
 Käännä ja käynnistä peli projektin kansiosta:
 
