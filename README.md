@@ -4,6 +4,7 @@ Yksinkertainen 2D-peli PlayStation 1:lle ja PSn00bSDK:lle. Ohjaimen ristiohjain
 liikuttaa sinistä ympyrää alustalla, ja värilliset ympyrät antavat satunnaisen
 liike-efektin kahdeksi sekunniksi. Käännös tuottaa PS-X EXE -tiedoston ja
 käynnistettävän CD-kuvan.
+Kerätyt efektit antavat peliaikaa; ajan loppuessa peli päättyy.
 
 ## Ympäristön asennus Linux Mintissä
 
@@ -57,6 +58,10 @@ projektiin.
   sekunnin efektin: nopeutuksen, hidastuksen, käänteiset ohjaimet, ruudun
   heilunnan tai värien vääristymisen. Efektit jonoutuvat ja aktivoituvat
   järjestyksessä; käynnissä oleva efekti ei korvaudu uudella.
+- Ensimmäisen efektin kerääminen käynnistää kahden sekunnin peliajan. Jokainen
+  uusi keräys lisää jäljellä olevaan aikaan kaksi sekuntia ja lisää efektin
+  jonoon. Ylempi palkki näyttää yhteisen peliajan, alempi aktiivisen efektin
+  keston ja QUEUE-rivi odottavat efektit. Jos yhteisaika loppuu, peli päättyy.
 
 Ympyrää voi liikuttaa myös DuckStationiin määritetyillä ristiohjaimen näppäimillä.
 

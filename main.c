@@ -10,9 +10,9 @@
 #define OT_LENGTH 256
 #define PACKET_BUFFER_SIZE 8192
 #define PLATFORM_LEFT 24
-#define PLATFORM_TOP 32
+#define PLATFORM_TOP 68
 #define PLATFORM_RIGHT 296
-#define PLATFORM_BOTTOM 208
+#define PLATFORM_BOTTOM 224
 #define CIRCLE_RADIUS 14
 #define PLAYER_SPEED 2
 #define STICK_DEADZONE 28
@@ -21,6 +21,8 @@
 #define COLLECTIBLE_RADIUS 8
 #define EFFECT_COUNT 5
 #define EFFECT_QUEUE_CAPACITY 8
+#define TIMER_BAR_X 8
+#define TIMER_BAR_WIDTH 304
 
 enum {
 	EFFECT_SPEED,
@@ -63,6 +65,10 @@ static const char *const effect_names[EFFECT_COUNT] = {
 	"COLOR GLITCH!"
 };
 
+static const char *const effect_short_names[EFFECT_COUNT] = {
+	"SP", "SL", "RV", "SH", "CL"
+};
+
 static const int8_t circle_offsets[16][2] = {
 	{ 0, -14 }, { 5, -13 }, { 10, -10 }, { 13, -5 },
 	{ 14, 0 }, { 13, 5 }, { 10, 10 }, { 5, 13 },
@@ -77,6 +83,56 @@ static int stick_direction(int value, int center) {
 	if (offset > 0)
 		return offset > 72 ? PLAYER_SPEED : 1;
 	return offset < -72 ? -PLAYER_SPEED : -1;
+}
+
+static uint8_t *draw_bar(
+	uint8_t *packet,
+	uint32_t *ordering_table,
+	int x,
+	int y,
+	int width,
+	int height,
+	int value,
+	int maximum,
+	int red,
+	int green,
+	int blue
+) {
+	POLY_F4 *background = (POLY_F4 *) packet;
+	setPolyF4(background);
+	setRGB0(background, 34, 39, 51);
+	background->x0 = x;
+	background->y0 = y;
+	background->x1 = x + width;
+	background->y1 = y;
+	background->x2 = x;
+	background->y2 = y + height;
+	background->x3 = x + width;
+	background->y3 = y + height;
+	addPrim(&ordering_table[6], background);
+	packet += sizeof(POLY_F4);
+
+	if (value > 0 && maximum > 0) {
+		POLY_F4 *fill = (POLY_F4 *) packet;
+		int fill_width = width * value / maximum;
+
+		if (fill_width < 1)
+			fill_width = 1;
+		setPolyF4(fill);
+		setRGB0(fill, red, green, blue);
+		fill->x0 = x;
+		fill->y0 = y;
+		fill->x1 = x + fill_width;
+		fill->y1 = y;
+		fill->x2 = x;
+		fill->y2 = y + height;
+		fill->x3 = x + fill_width;
+		fill->y3 = y + height;
+		addPrim(&ordering_table[5], fill);
+		packet += sizeof(POLY_F4);
+	}
+
+	return packet;
 }
 
 static void apply_color_filter(
@@ -248,7 +304,7 @@ int main(void) {
 	SetDispMask(1);
 
 	int player_x = SCREEN_WIDTH / 2;
-	int player_y = SCREEN_HEIGHT / 2;
+	int player_y = (PLATFORM_TOP + PLATFORM_BOTTOM) / 2;
 	int active_buffer = 0;
 	int controller_type = -1;
 	int calibration_samples = 0;
@@ -256,6 +312,7 @@ int main(void) {
 	int calibration_sum_y = 0;
 	int stick_center_x = 128;
 	int stick_center_y = 128;
+	int game_started = 0;
 	int effect_type = -1;
 	int effect_frames = 0;
 	int effect_queue[EFFECT_QUEUE_CAPACITY];
@@ -263,7 +320,14 @@ int main(void) {
 	int queue_count = 0;
 	int effect_duration =
 		GetVideoMode() == MODE_PAL ? 100 : 120;
+	int frames_per_second =
+		GetVideoMode() == MODE_PAL ? 50 : 60;
+	int game_time_frames = 0;
+	int max_game_time_frames =
+		effect_duration * (EFFECT_QUEUE_CAPACITY + 1);
 	char effect_status[48];
+	char time_status[24];
+	char queue_status[48];
 	Collectible collectibles[COLLECTIBLE_COUNT] = { 0 };
 
 	srand(VSync(-1));
@@ -285,6 +349,7 @@ int main(void) {
 		uint16_t buttons = pad_ready ? pad->btn : 0xffff;
 		int move_x = 0;
 		int move_y = 0;
+		int game_over = game_started && game_time_frames <= 0;
 		int analog_pad =
 			pad_ready &&
 			(pad->type == PAD_ID_ANALOG ||
@@ -337,6 +402,11 @@ int main(void) {
 			calibration_samples == STICK_CALIBRATION_SAMPLES)
 			move_y = stick_direction(pad->ls_y, stick_center_y);
 
+		if (game_over) {
+			move_x = 0;
+			move_y = 0;
+		}
+
 		if (effect_frames > 0) {
 			if (effect_type == EFFECT_SPEED) {
 				move_x *= 2;
@@ -370,11 +440,14 @@ int main(void) {
 			int collision_distance = CIRCLE_RADIUS + COLLECTIBLE_RADIUS;
 			if (dx * dx + dy * dy <=
 				collision_distance * collision_distance &&
-				queue_count < EFFECT_QUEUE_CAPACITY) {
+				queue_count < EFFECT_QUEUE_CAPACITY &&
+				!game_over) {
 				int queue_tail =
 					(queue_head + queue_count) % EFFECT_QUEUE_CAPACITY;
 				effect_queue[queue_tail] = rand() % EFFECT_COUNT;
 				queue_count++;
+				game_time_frames += effect_duration;
+				game_started = 1;
 				place_collectible(
 					&collectibles[i], collectibles, i, player_x, player_y
 				);
@@ -391,6 +464,25 @@ int main(void) {
 		);
 
 		ClearOTagR(draw_buffer->ordering_table, OT_LENGTH);
+		int game_seconds =
+			(game_time_frames + frames_per_second - 1) /
+			frames_per_second;
+		int timer_red = game_seconds <= 10 ? 235 : 80;
+		int timer_green = game_seconds <= 10 ? 65 : 210;
+		int timer_blue = 75;
+		packet = draw_bar(
+			packet,
+			draw_buffer->ordering_table,
+			TIMER_BAR_X,
+			8,
+			TIMER_BAR_WIDTH,
+			6,
+			game_time_frames,
+			max_game_time_frames,
+			timer_red,
+			timer_green,
+			timer_blue
+		);
 		int color_filter = effect_frames > 0 &&
 			effect_type == EFFECT_COLOR_GLITCH;
 		int shake_x = effect_frames > 0 &&
@@ -443,57 +535,106 @@ int main(void) {
 			shake_y,
 			color_filter
 		);
-		if (effect_frames > 0 && queue_count > 0) {
-			snprintf(
-				effect_status,
-				sizeof(effect_status),
-				"%s  QUEUED: %d",
-				effect_names[effect_type],
-				queue_count
-			);
+		int active_effect_seconds =
+			(effect_frames + frames_per_second - 1) /
+			frames_per_second;
+		if (game_over) {
+			snprintf(effect_status, sizeof(effect_status), "GAME OVER");
+			snprintf(queue_status, sizeof(queue_status), "TIME RAN OUT");
 		} else if (effect_frames > 0) {
 			snprintf(
 				effect_status,
 				sizeof(effect_status),
-				"%s",
-				effect_names[effect_type]
+				"ACTIVE: %s %ds",
+				effect_names[effect_type],
+				active_effect_seconds
 			);
-		} else if (queue_count > 0) {
-			snprintf(
-				effect_status,
-				sizeof(effect_status),
-				"EFFECTS QUEUED: %d",
-				queue_count
-			);
-		} else if (!pad_ready) {
+		} else if (
+			!pad_ready
+		) {
 			snprintf(effect_status, sizeof(effect_status), "CONNECT CONTROLLER");
 		} else if (
-			analog_pad &&
-			calibration_samples < STICK_CALIBRATION_SAMPLES
+			analog_pad && calibration_samples < STICK_CALIBRATION_SAMPLES
 		) {
-			snprintf(
-				effect_status,
-				sizeof(effect_status),
-				"CENTER STICK TO CALIBRATE"
-			);
+			snprintf(effect_status, sizeof(effect_status), "CENTER STICK");
 		} else {
 			snprintf(
 				effect_status,
 				sizeof(effect_status),
-				"COLLECT COLORED CIRCLES!"
+				game_started ? "NO ACTIVE EFFECT" : "COLLECT TO START TIMER"
 			);
 		}
 
-		FntSort(
+		int queue_length = snprintf(
+			queue_status, sizeof(queue_status), "QUEUE:"
+		);
+		for (int i = 0; i < queue_count; i++) {
+			int queue_index =
+				(queue_head + i) % EFFECT_QUEUE_CAPACITY;
+			int effect = effect_queue[queue_index];
+			queue_length += snprintf(
+				queue_status + queue_length,
+				sizeof(queue_status) - queue_length,
+				" %s",
+				effect_short_names[effect]
+			);
+		}
+		if (!queue_count)
+			snprintf(queue_status, sizeof(queue_status), "QUEUE: EMPTY");
+
+		if (game_started) {
+			snprintf(
+				time_status,
+				sizeof(time_status),
+				"TIME: %ds",
+				game_seconds
+			);
+		} else {
+			snprintf(time_status, sizeof(time_status), "TIME: --");
+		}
+
+		if (effect_frames > 0) {
+			packet = draw_bar(
+				packet,
+				draw_buffer->ordering_table,
+				TIMER_BAR_X,
+				44,
+				TIMER_BAR_WIDTH,
+				4,
+				effect_frames,
+				effect_duration,
+				100,
+				205,
+				250
+			);
+		}
+
+		packet = FntSort(
 			&draw_buffer->ordering_table[0],
 			packet,
 			8,
-			20,
+			18,
+			time_status
+		);
+		packet = FntSort(
+			&draw_buffer->ordering_table[0],
+			packet,
+			8,
+			32,
 			effect_status
+		);
+		packet = FntSort(
+			&draw_buffer->ordering_table[0],
+			packet,
+			8,
+			50,
+			queue_status
 		);
 
 		DrawSync(0);
 		VSync(0);
+		if (game_started && !game_over && game_time_frames > 0)
+			game_time_frames--;
 		if (effect_frames > 0)
 			effect_frames--;
 		PutDispEnv(&display_buffer->display);

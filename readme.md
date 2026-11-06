@@ -7,6 +7,9 @@ kalibrointitekstin näkyessä. Ristiohjain ei tarvitse kalibrointia.
 Kerää värillisiä ympyröitä. Jokainen antaa satunnaisen kahden sekunnin efektin:
 nopeutus, hidastus, käänteiset ohjaimet, ruudun heilunta tai värien vääristymä.
 Kerätyt efektit jonoutuvat ja aktivoituvat peräkkäin.
+Ensimmäinen keräys antaa kaksi sekuntia peliaikaa; jokainen lisäkeräys lisää
+jäljellä olevaan aikaan kaksi sekuntia. Jos aika loppuu, peli päättyy.
+Aktiivisella efektillä on oma kestopalkki, ja QUEUE-rivi näyttää jonossa odottavat.
 
 Käännä ja käynnistä peli projektin kansiosta:
 
