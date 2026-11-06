@@ -1,7 +1,7 @@
 # Hello World – PlayStation 1
 
-PS1-ohjaimen testipeli PSn00bSDK:lla. Ruutu näyttää kaikki ohjaimen napit:
-painetut napit vaihtavat väriä, ja viimeksi painettu nappi näytetään erikseen.
+Yksinkertainen PS1:n kolmannen persoonan peli PSn00bSDK:lla. Ohjattava palikka
+liikkuu tasaisella kentällä, ja kameraa voi kiertää palikan ympärillä.
 Käännös tuottaa PS-X EXE -tiedoston ja käynnistettävän CD-kuvan.
 
 ## Ympäristön asennus Linux Mintissä
@@ -47,9 +47,29 @@ omasta konsolistasi dumpattua BIOS-tiedostoa ja valitse se DuckStationin
 ensimmäisen käynnistyksen ohjatussa asennuksessa. BIOS ei sisälly tähän
 projektiin.
 
-## Ohjaintesti
+## Ohjaimet
 
-Käynnistä `build/hello.cue` DuckStationissa ja paina ohjaimen nappeja. Pidetty
-nappi näkyy ruudulla vihreänä, ja `LAST PRESSED` näyttää viimeksi painetun
-napin, esimerkiksi `X`. Testi tunnistaa ristiohjaimen, SELECT/START-, L1/L2/L3-,
-R1/R2/R3- ja neljä toimintanappia.
+- Vasen tatti liikuttaa hahmoa suhteessa kameran suuntaan.
+- Oikea tatti kiertää kameraa hahmon ympärillä ja muuttaa kuvakulman korkeutta.
+
+Peli tarvitsee analogisen ohjaimen, kuten DualShockin. Näppäinohjaimella tai
+digitaalisella ohjaimella analogiset liikkeet eivät ole käytettävissä.
+
+## Run and Debug VS Codessa
+
+Asenna MIPS-etädebuggausta tukeva GDB:
+
+```sh
+sudo apt install gdb-multiarch
+```
+
+Asenna lisäksi VS Coden Microsoft C/C++ -laajennus (`ms-vscode.cpptools`).
+
+Ota DuckStationissa käyttöön **Settings > Debugging > Enable GDB Server** ja
+aseta portiksi `2345`. Valitse sen jälkeen VS Coden **Run and Debug** -näkymästä
+**PS1: Run and Debug in DuckStation** ja paina F5. VS Code kääntää pelin,
+käynnistää DuckStationin levykuvan ja liittää debuggerin peliin. C-tiedoston
+rivikohdat toimivat lähdedebuggauksessa.
+
+Jos DuckStation on asennettu muualle kuin oletuspolkuun, aseta
+`DUCKSTATION`-ympäristömuuttuja osoittamaan sen suoritettavaan tiedostoon.

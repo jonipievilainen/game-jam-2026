@@ -1,0 +1,18 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "PS1: Run and Debug in DuckStation",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/hello.elf",
+			"cwd": "${workspaceFolder}",
+			"miDebuggerPath": "gdb-multiarch",
+			"miDebuggerServerAddress": "127.0.0.1:2345",
+			"MIMode": "gdb",
+			"launchCompleteCommand": "exec-continue",
+			"stopAtEntry": false,
+			"preLaunchTask": "Start PS1 game for debugging"
+		}
+	]
+}

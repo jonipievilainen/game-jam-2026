@@ -1,0 +1,26 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build PS1 game",
+			"type": "shell",
+			"command": "${workspaceFolder}/build.sh",
+			"problemMatcher": []
+		},
+		{
+			"label": "Start PS1 game for debugging",
+			"type": "shell",
+			"command": "/bin/bash",
+			"args": [
+				"${workspaceFolder}/.vscode/start-debug.sh"
+			],
+			"dependsOn": "Build PS1 game",
+			"dependsOrder": "sequence",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"problemMatcher": []
+		}
+	]
+}
