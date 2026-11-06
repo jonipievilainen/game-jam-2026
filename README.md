@@ -60,6 +60,9 @@ projektiin.
   järjestyksessä; käynnissä oleva efekti ei korvaudu uudella.
 - Jokainen keräys pienentää kaikkia ympyröitä. Koot pienenevät vähimmäiskokoon
   asti, jotta ympyrät pysyvät näkyvinä ja kerättävinä.
+- Sinisen ympyrän naama näyttää jäljellä olevan peliajan: 60–100 % `:D`,
+  40–59 % `:\`, 10–39 % `:(` ja alle 10 % `x(`. Pelaajaympyrän vähimmäiskoko
+  pitää ilmeet luettavina pienentymisen jälkeenkin.
 - Ensimmäisen efektin kerääminen käynnistää kahden sekunnin peliajan. Jokainen
   uusi keräys lisää jäljellä olevaan aikaan kaksi sekuntia ja lisää efektin
   jonoon. Ylempi palkki näyttää yhteisen peliajan, alempi aktiivisen efektin

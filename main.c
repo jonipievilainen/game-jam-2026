@@ -14,7 +14,7 @@
 #define PLATFORM_RIGHT 296
 #define PLATFORM_BOTTOM 224
 #define CIRCLE_RADIUS 14
-#define MIN_PLAYER_RADIUS 3
+#define MIN_PLAYER_RADIUS 8
 #define PLAYER_SPEED 2
 #define STICK_DEADZONE 28
 #define STICK_CALIBRATION_SAMPLES 16
@@ -93,6 +93,188 @@ static int get_circle_radius(int base_radius, int shrink_steps, int minimum) {
 	return radius < minimum ? minimum : radius;
 }
 
+static uint8_t *draw_face_rect(
+	uint8_t *packet,
+	uint32_t *ordering_table,
+	int left,
+	int top,
+	int right,
+	int bottom
+) {
+	POLY_F4 *rectangle = (POLY_F4 *) packet;
+
+	setPolyF4(rectangle);
+	setRGB0(rectangle, 8, 24, 34);
+	rectangle->x0 = (int16_t) left;
+	rectangle->y0 = (int16_t) top;
+	rectangle->x1 = (int16_t) right;
+	rectangle->y1 = (int16_t) top;
+	rectangle->x2 = (int16_t) left;
+	rectangle->y2 = (int16_t) bottom;
+	rectangle->x3 = (int16_t) right;
+	rectangle->y3 = (int16_t) bottom;
+	addPrim(&ordering_table[1], rectangle);
+
+	return packet + sizeof(POLY_F4);
+}
+
+static uint8_t *draw_face_teeth(
+	uint8_t *packet,
+	uint32_t *ordering_table,
+	int left,
+	int top,
+	int right,
+	int bottom
+) {
+	POLY_F4 *rectangle = (POLY_F4 *) packet;
+
+	setPolyF4(rectangle);
+	setRGB0(rectangle, 225, 238, 230);
+	rectangle->x0 = (int16_t) left;
+	rectangle->y0 = (int16_t) top;
+	rectangle->x1 = (int16_t) right;
+	rectangle->y1 = (int16_t) top;
+	rectangle->x2 = (int16_t) left;
+	rectangle->y2 = (int16_t) bottom;
+	rectangle->x3 = (int16_t) right;
+	rectangle->y3 = (int16_t) bottom;
+	addPrim(&ordering_table[1], rectangle);
+
+	return packet + sizeof(POLY_F4);
+}
+
+static uint8_t *draw_face_line(
+	uint8_t *packet,
+	uint32_t *ordering_table,
+	int x0,
+	int y0,
+	int x1,
+	int y1
+) {
+	LINE_F2 *line = (LINE_F2 *) packet;
+
+	setLineF2(line);
+	setRGB0(line, 8, 24, 34);
+	line->x0 = (int16_t) x0;
+	line->y0 = (int16_t) y0;
+	line->x1 = (int16_t) x1;
+	line->y1 = (int16_t) y1;
+	addPrim(&ordering_table[1], line);
+
+	return packet + sizeof(LINE_F2);
+}
+
+static uint8_t *draw_player_face(
+	uint8_t *packet,
+	uint32_t *ordering_table,
+	int center_x,
+	int center_y,
+	int radius,
+	int expression
+) {
+	int eye_offset = radius / 3;
+	int eye_y = center_y - radius / 4;
+	int eye_size = radius >= 10 ? 2 : 1;
+	int mouth_width = radius / 2;
+	int mouth_y = center_y + radius / 4;
+
+	if (eye_offset < 1)
+		eye_offset = 1;
+	if (mouth_width < 1)
+		mouth_width = 1;
+
+	if (expression == 3) {
+		int cross_size = eye_size;
+		packet = draw_face_line(
+			packet, ordering_table,
+			center_x - eye_offset - cross_size, eye_y - cross_size,
+			center_x - eye_offset + cross_size, eye_y + cross_size
+		);
+		packet = draw_face_line(
+			packet, ordering_table,
+			center_x - eye_offset + cross_size, eye_y - cross_size,
+			center_x - eye_offset - cross_size, eye_y + cross_size
+		);
+		packet = draw_face_line(
+			packet, ordering_table,
+			center_x + eye_offset - cross_size, eye_y - cross_size,
+			center_x + eye_offset + cross_size, eye_y + cross_size
+		);
+		packet = draw_face_line(
+			packet, ordering_table,
+			center_x + eye_offset + cross_size, eye_y - cross_size,
+			center_x + eye_offset - cross_size, eye_y + cross_size
+		);
+	} else {
+		packet = draw_face_rect(
+			packet,
+			ordering_table,
+			center_x - eye_offset,
+			eye_y,
+			center_x - eye_offset + eye_size,
+			eye_y + eye_size
+		);
+		packet = draw_face_rect(
+			packet,
+			ordering_table,
+			center_x + eye_offset - eye_size,
+			eye_y,
+			center_x + eye_offset,
+			eye_y + eye_size
+		);
+	}
+
+	if (expression == 0) {
+		int mouth_height = radius / 3;
+		if (mouth_height < 1)
+			mouth_height = 1;
+		packet = draw_face_teeth(
+			packet,
+			ordering_table,
+			center_x - mouth_width + 1,
+			mouth_y,
+			center_x + mouth_width - 1,
+			mouth_y + 1
+		);
+		packet = draw_face_rect(
+			packet,
+			ordering_table,
+			center_x - mouth_width,
+			mouth_y,
+			center_x + mouth_width,
+			mouth_y + mouth_height
+		);
+	} else if (expression == 1) {
+		packet = draw_face_line(
+			packet,
+			ordering_table,
+			center_x - mouth_width,
+			mouth_y,
+			center_x + mouth_width,
+			mouth_y + mouth_width
+		);
+	} else if (expression == 2 || expression == 3) {
+		packet = draw_face_line(
+			packet,
+			ordering_table,
+			center_x - mouth_width,
+			mouth_y + 1,
+			center_x,
+			mouth_y
+		);
+		packet = draw_face_line(
+			packet,
+			ordering_table,
+			center_x,
+			mouth_y,
+			center_x + mouth_width,
+			mouth_y + 1
+		);
+	}
+
+	return packet;
+}
+
 static uint8_t *draw_bar(
 	uint8_t *packet,
 	uint32_t *ordering_table,
@@ -122,7 +304,8 @@ static uint8_t *draw_bar(
 
 	if (value > 0 && maximum > 0) {
 		POLY_F4 *fill = (POLY_F4 *) packet;
-		int fill_width = width * value / maximum;
+		int clamped_value = value > maximum ? maximum : value;
+		int fill_width = width * clamped_value / maximum;
 
 		if (fill_width < 1)
 			fill_width = 1;
@@ -545,6 +728,18 @@ int main(void) {
 		int game_seconds =
 			(game_time_frames + frames_per_second - 1) /
 			frames_per_second;
+		int time_percent =
+			game_started && max_game_time_frames > 0
+				? game_time_frames * 100 / max_game_time_frames
+				: 100;
+		if (time_percent > 100)
+			time_percent = 100;
+		if (time_percent < 0)
+			time_percent = 0;
+		int face_expression =
+			time_percent >= 60 ? 0 :
+			time_percent >= 40 ? 1 :
+			time_percent >= 10 ? 2 : 3;
 		int timer_red = game_seconds <= 10 ? 235 : 80;
 		int timer_green = game_seconds <= 10 ? 65 : 210;
 		int timer_blue = 75;
@@ -586,6 +781,16 @@ int main(void) {
 			color_filter
 		);
 		for (int i = 0; i < COLLECTIBLE_COUNT; i++) {
+			packet = draw_player_face(
+				packet,
+				draw_buffer->ordering_table,
+				player_x + shake_x,
+				player_y + shake_y,
+				get_circle_radius(
+					CIRCLE_RADIUS, circle_shrink, MIN_PLAYER_RADIUS
+				),
+				face_expression
+			);
 			packet = draw_circle(
 				packet,
 				draw_buffer->ordering_table,

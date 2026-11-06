@@ -9,6 +9,9 @@ nopeutus, hidastus, käänteiset ohjaimet, ruudun heilunta tai värien väärist
 Kerätyt efektit jonoutuvat ja aktivoituvat peräkkäin.
 Jokainen keräys pienentää sinistä ympyrää ja kaikkia kerättäviä ympyröitä,
 kunnes ne saavuttavat pienen vähimmäiskoon.
+Sinisen ympyrän ilme muuttuu peliajan mukaan: 60–100 % `:D`, 40–59 % `:\`,
+10–39 % `:(` ja alle 10 % `x(`. Pelaajaympyrän minimikoko pitää ilmeen
+luettavana.
 Ensimmäinen keräys antaa kaksi sekuntia peliaikaa; jokainen lisäkeräys lisää
 jäljellä olevaan aikaan kaksi sekuntia. Jos aika loppuu, paina Start
 aloittaaksesi pelin uudelleen.
