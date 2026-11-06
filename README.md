@@ -1,7 +1,8 @@
 # PlayStation 1 - 2D
 
 Yksinkertainen 2D-peli PlayStation 1:lle ja PSn00bSDK:lle. Ohjaimen ristiohjain
-liikuttaa ympyrää alustalla. Käännös tuottaa PS-X EXE -tiedoston ja
+liikuttaa sinistä ympyrää alustalla, ja värilliset ympyrät antavat satunnaisen
+liike-efektin kahdeksi sekunniksi. Käännös tuottaa PS-X EXE -tiedoston ja
 käynnistettävän CD-kuvan.
 
 ## Ympäristön asennus Linux Mintissä
@@ -52,6 +53,8 @@ projektiin.
 - Ohjaimen ristiohjain liikuttaa ympyrää alustalla.
 - Analogiohjaimen vasen tatti liikuttaa ympyrää. Tatti kalibroidaan automaattisesti
   ohjaimen kytkemisen jälkeen: pidä se keskellä kalibrointitekstin ajan.
+- Kerää värillisiä ympyröitä sinisellä ympyrällä. Saat satunnaisesti nopeutuksen,
+  hidastuksen tai käänteiset ohjaimet kahdeksi sekunniksi.
 
 Ympyrää voi liikuttaa myös DuckStationiin määritetyillä ristiohjaimen näppäimillä.
 

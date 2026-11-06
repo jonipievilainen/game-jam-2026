@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdlib.h>
 #include <psxapi.h>
 #include <psxgpu.h>
 #include <psxpad.h>
@@ -15,6 +16,9 @@
 #define PLAYER_SPEED 2
 #define STICK_DEADZONE 28
 #define STICK_CALIBRATION_SAMPLES 16
+#define COLLECTIBLE_COUNT 4
+#define COLLECTIBLE_RADIUS 8
+#define EFFECT_COUNT 3
 
 typedef struct {
 	DISPENV display;
@@ -23,8 +27,29 @@ typedef struct {
 	uint8_t packets[PACKET_BUFFER_SIZE];
 } FrameBuffer;
 
+typedef struct {
+	int x;
+	int y;
+	uint8_t red;
+	uint8_t green;
+	uint8_t blue;
+} Collectible;
+
 static FrameBuffer buffers[2];
 static uint8_t pad_buffers[2][34];
+
+static const uint8_t collectible_colors[COLLECTIBLE_COUNT][3] = {
+	{ 245, 76, 82 },
+	{ 255, 205, 62 },
+	{ 145, 96, 245 },
+	{ 65, 225, 145 }
+};
+
+static const char *const effect_names[EFFECT_COUNT] = {
+	"SPEED BOOST!",
+	"SLOW MOTION!",
+	"REVERSED CONTROLS!"
+};
 
 static const int8_t circle_offsets[16][2] = {
 	{ 0, -14 }, { 5, -13 }, { 10, -10 }, { 13, -5 },
@@ -78,25 +103,75 @@ static uint8_t *draw_circle(
 	uint8_t *packet,
 	uint32_t *ordering_table,
 	int center_x,
-	int center_y
+	int center_y,
+	int radius,
+	int red,
+	int green,
+	int blue
 ) {
 	for (int i = 0; i < 16; i++) {
 		int next = (i + 1) & 15;
 		POLY_F3 *triangle = (POLY_F3 *) packet;
 
 		setPolyF3(triangle);
-		setRGB0(triangle, 70, 190, 245);
+		setRGB0(triangle, red, green, blue);
 		triangle->x0 = (int16_t) center_x;
 		triangle->y0 = (int16_t) center_y;
-		triangle->x1 = (int16_t) (center_x + circle_offsets[i][0]);
-		triangle->y1 = (int16_t) (center_y + circle_offsets[i][1]);
-		triangle->x2 = (int16_t) (center_x + circle_offsets[next][0]);
-		triangle->y2 = (int16_t) (center_y + circle_offsets[next][1]);
+		triangle->x1 = (int16_t) (
+			center_x + circle_offsets[i][0] * radius / CIRCLE_RADIUS
+		);
+		triangle->y1 = (int16_t) (
+			center_y + circle_offsets[i][1] * radius / CIRCLE_RADIUS
+		);
+		triangle->x2 = (int16_t) (
+			center_x + circle_offsets[next][0] * radius / CIRCLE_RADIUS
+		);
+		triangle->y2 = (int16_t) (
+			center_y + circle_offsets[next][1] * radius / CIRCLE_RADIUS
+		);
 		addPrim(&ordering_table[1], triangle);
 		packet += sizeof(POLY_F3);
 	}
 
 	return packet;
+}
+
+static void place_collectible(
+	Collectible *collectible,
+	const Collectible collectibles[COLLECTIBLE_COUNT],
+	int index,
+	int player_x,
+	int player_y
+) {
+	int safe = 0;
+
+	while (!safe) {
+		safe = 1;
+		collectible->x = PLATFORM_LEFT + COLLECTIBLE_RADIUS +
+			rand() % (PLATFORM_RIGHT - PLATFORM_LEFT -
+				2 * COLLECTIBLE_RADIUS + 1);
+		collectible->y = PLATFORM_TOP + COLLECTIBLE_RADIUS +
+			rand() % (PLATFORM_BOTTOM - PLATFORM_TOP -
+				2 * COLLECTIBLE_RADIUS + 1);
+
+		int player_dx = collectible->x - player_x;
+		int player_dy = collectible->y - player_y;
+		if (player_dx * player_dx + player_dy * player_dy < 40 * 40)
+			safe = 0;
+
+		for (int i = 0; safe && i < COLLECTIBLE_COUNT; i++) {
+			if (i == index)
+				continue;
+			int dx = collectible->x - collectibles[i].x;
+			int dy = collectible->y - collectibles[i].y;
+			if (dx * dx + dy * dy < 24 * 24)
+				safe = 0;
+		}
+	}
+
+	collectible->red = collectible_colors[index][0];
+	collectible->green = collectible_colors[index][1];
+	collectible->blue = collectible_colors[index][2];
 }
 
 int main(void) {
@@ -123,6 +198,17 @@ int main(void) {
 	int calibration_sum_y = 0;
 	int stick_center_x = 128;
 	int stick_center_y = 128;
+	int effect_type = -1;
+	int effect_frames = 0;
+	int effect_duration =
+		GetVideoMode() == MODE_PAL ? 100 : 120;
+	Collectible collectibles[COLLECTIBLE_COUNT] = { 0 };
+
+	srand(VSync(-1));
+	for (int i = 0; i < COLLECTIBLE_COUNT; i++)
+		place_collectible(
+			&collectibles[i], collectibles, i, player_x, player_y
+		);
 
 	for (;;) {
 		FrameBuffer *draw_buffer = &buffers[active_buffer];
@@ -180,6 +266,21 @@ int main(void) {
 			calibration_samples == STICK_CALIBRATION_SAMPLES)
 			move_y = stick_direction(pad->ls_y, stick_center_y);
 
+		if (effect_frames > 0) {
+			if (effect_type == 0) {
+				move_x *= 2;
+				move_y *= 2;
+			} else if (effect_type == 1) {
+				if (move_x)
+					move_x = move_x > 0 ? 1 : -1;
+				if (move_y)
+					move_y = move_y > 0 ? 1 : -1;
+			} else if (effect_type == 2) {
+				move_x = -move_x;
+				move_y = -move_y;
+			}
+		}
+
 		player_x += move_x;
 		player_y += move_y;
 
@@ -192,29 +293,63 @@ int main(void) {
 		if (player_y > PLATFORM_BOTTOM - CIRCLE_RADIUS)
 			player_y = PLATFORM_BOTTOM - CIRCLE_RADIUS;
 
+		for (int i = 0; i < COLLECTIBLE_COUNT; i++) {
+			int dx = player_x - collectibles[i].x;
+			int dy = player_y - collectibles[i].y;
+			int collision_distance = CIRCLE_RADIUS + COLLECTIBLE_RADIUS;
+			if (dx * dx + dy * dy <=
+				collision_distance * collision_distance) {
+				effect_type = rand() % EFFECT_COUNT;
+				effect_frames = effect_duration;
+				place_collectible(
+					&collectibles[i], collectibles, i, player_x, player_y
+				);
+			}
+		}
+
 		ClearOTagR(draw_buffer->ordering_table, OT_LENGTH);
 		packet = draw_platform(packet, draw_buffer->ordering_table);
+		for (int i = 0; i < COLLECTIBLE_COUNT; i++) {
+			packet = draw_circle(
+				packet,
+				draw_buffer->ordering_table,
+				collectibles[i].x,
+				collectibles[i].y,
+				COLLECTIBLE_RADIUS,
+				collectibles[i].red,
+				collectibles[i].green,
+				collectibles[i].blue
+			);
+		}
 		packet = draw_circle(
 			packet,
 			draw_buffer->ordering_table,
 			player_x,
-			player_y
+			player_y,
+			CIRCLE_RADIUS,
+			70,
+			190,
+			245
 		);
 		FntSort(
 			&draw_buffer->ordering_table[0],
 			packet,
 			8,
 			20,
-			!pad_ready
-				? "CONNECT CONTROLLER"
-				: analog_pad &&
-					calibration_samples < STICK_CALIBRATION_SAMPLES
-					? "CENTER STICK TO CALIBRATE"
-					: "D-PAD / STICK: MOVE CIRCLE"
+			effect_frames > 0
+				? effect_names[effect_type]
+				: !pad_ready
+					? "CONNECT CONTROLLER"
+					: analog_pad &&
+						calibration_samples < STICK_CALIBRATION_SAMPLES
+						? "CENTER STICK TO CALIBRATE"
+						: "COLLECT COLORED CIRCLES!"
 		);
 
 		DrawSync(0);
 		VSync(0);
+		if (effect_frames > 0)
+			effect_frames--;
 		PutDispEnv(&display_buffer->display);
 		DrawOTagEnv(
 			&draw_buffer->ordering_table[OT_LENGTH - 1],
