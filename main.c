@@ -1043,22 +1043,28 @@ int main(void) {
 			);
 		}
 
-		int queue_length = snprintf(
-			queue_status, sizeof(queue_status), "QUEUE:"
-		);
-		for (int i = 0; i < queue_count; i++) {
-			int queue_index =
-				(queue_head + i) % EFFECT_QUEUE_CAPACITY;
-			int effect = effect_queue[queue_index];
-			queue_length += snprintf(
-				queue_status + queue_length,
-				sizeof(queue_status) - queue_length,
-				" %s",
-				effect_short_names[effect]
+		if (!game_over) {
+			int queue_length = snprintf(
+				queue_status, sizeof(queue_status), "QUEUE:"
 			);
+			for (int i = 0; i < queue_count; i++) {
+				int queue_index =
+					(queue_head + i) % EFFECT_QUEUE_CAPACITY;
+				int effect = effect_queue[queue_index];
+				queue_length += snprintf(
+					queue_status + queue_length,
+					sizeof(queue_status) - queue_length,
+					" %s",
+					effect_short_names[effect]
+				);
+			}
+			if (!queue_count)
+				snprintf(
+					queue_status,
+					sizeof(queue_status),
+					"QUEUE: EMPTY"
+				);
 		}
-		if (!queue_count)
-			snprintf(queue_status, sizeof(queue_status), "QUEUE: EMPTY");
 
 		if (game_started) {
 			snprintf(
