@@ -1,8 +1,8 @@
 # Hello World – PlayStation 1
 
-Pieni PS1-homebrew-peli PSn00bSDK:lla. Peli näyttää PS1:n ruudulla tervehdyksen
-ja väripalkin käyttäen kaksinkertaista kuvapuskurointia. Käännös tuottaa PS-X
-EXE -tiedoston ja käynnistettävän CD-kuvan.
+PS1-ohjaimen testipeli PSn00bSDK:lla. Ruutu näyttää kaikki ohjaimen napit:
+painetut napit vaihtavat väriä, ja viimeksi painettu nappi näytetään erikseen.
+Käännös tuottaa PS-X EXE -tiedoston ja käynnistettävän CD-kuvan.
 
 ## Ympäristön asennus Linux Mintissä
 
@@ -46,3 +46,10 @@ sisälly projektiin. DuckStation vaatii PlayStation BIOS -tiedoston. Käytä
 omasta konsolistasi dumpattua BIOS-tiedostoa ja valitse se DuckStationin
 ensimmäisen käynnistyksen ohjatussa asennuksessa. BIOS ei sisälly tähän
 projektiin.
+
+## Ohjaintesti
+
+Käynnistä `build/hello.cue` DuckStationissa ja paina ohjaimen nappeja. Pidetty
+nappi näkyy ruudulla vihreänä, ja `LAST PRESSED` näyttää viimeksi painetun
+napin, esimerkiksi `X`. Testi tunnistaa ristiohjaimen, SELECT/START-, L1/L2/L3-,
+R1/R2/R3- ja neljä toimintanappia.
