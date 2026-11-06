@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "command": true,
+        "true": true,
+        "uname": true,
+        "id": true
+    }
+}
