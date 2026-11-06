@@ -375,6 +375,34 @@ int main(void) {
 			(pad->type == PAD_ID_ANALOG ||
 			 pad->type == PAD_ID_ANALOG_STICK);
 
+		if (game_over && pad_ready && !(buttons & PAD_START)) {
+			player_x = SCREEN_WIDTH / 2;
+			player_y = (PLATFORM_TOP + PLATFORM_BOTTOM) / 2;
+			game_started = 0;
+			circle_shrink = 0;
+			effect_type = -1;
+			effect_frames = 0;
+			queue_head = 0;
+			queue_count = 0;
+			game_time_frames = 0;
+			game_over = 0;
+
+			for (int i = 0; i < COLLECTIBLE_COUNT; i++) {
+				collectibles[i].x = 0;
+				collectibles[i].y = 0;
+			}
+			for (int i = 0; i < COLLECTIBLE_COUNT; i++)
+				place_collectible(
+					&collectibles[i],
+					collectibles,
+					i,
+					player_x,
+					player_y,
+					COLLECTIBLE_RADIUS,
+					CIRCLE_RADIUS
+				);
+		}
+
 		start_next_effect(
 			effect_queue,
 			&queue_head,
@@ -596,7 +624,11 @@ int main(void) {
 			frames_per_second;
 		if (game_over) {
 			snprintf(effect_status, sizeof(effect_status), "GAME OVER");
-			snprintf(queue_status, sizeof(queue_status), "TIME RAN OUT");
+			snprintf(
+				queue_status,
+				sizeof(queue_status),
+				"PRESS START TO RESTART"
+			);
 		} else if (effect_frames > 0) {
 			snprintf(
 				effect_status,

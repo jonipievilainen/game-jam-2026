@@ -63,7 +63,8 @@ projektiin.
 - Ensimmäisen efektin kerääminen käynnistää kahden sekunnin peliajan. Jokainen
   uusi keräys lisää jäljellä olevaan aikaan kaksi sekuntia ja lisää efektin
   jonoon. Ylempi palkki näyttää yhteisen peliajan, alempi aktiivisen efektin
-  keston ja QUEUE-rivi odottavat efektit. Jos yhteisaika loppuu, peli päättyy.
+  keston ja QUEUE-rivi odottavat efektit. Jos yhteisaika loppuu, paina Start
+  aloittaaksesi uuden pelin.
 
 Ympyrää voi liikuttaa myös DuckStationiin määritetyillä ristiohjaimen näppäimillä.
 

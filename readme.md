@@ -10,7 +10,8 @@ Kerätyt efektit jonoutuvat ja aktivoituvat peräkkäin.
 Jokainen keräys pienentää sinistä ympyrää ja kaikkia kerättäviä ympyröitä,
 kunnes ne saavuttavat pienen vähimmäiskoon.
 Ensimmäinen keräys antaa kaksi sekuntia peliaikaa; jokainen lisäkeräys lisää
-jäljellä olevaan aikaan kaksi sekuntia. Jos aika loppuu, peli päättyy.
+jäljellä olevaan aikaan kaksi sekuntia. Jos aika loppuu, paina Start
+aloittaaksesi pelin uudelleen.
 Aktiivisella efektillä on oma kestopalkki, ja QUEUE-rivi näyttää jonossa odottavat.
 
 Käännä ja käynnistä peli projektin kansiosta:
