@@ -13,6 +13,8 @@
 #define PLATFORM_BOTTOM 208
 #define CIRCLE_RADIUS 14
 #define PLAYER_SPEED 2
+#define STICK_DEADZONE 28
+#define STICK_CALIBRATION_SAMPLES 16
 
 typedef struct {
 	DISPENV display;
@@ -30,6 +32,15 @@ static const int8_t circle_offsets[16][2] = {
 	{ 0, 14 }, { -5, 13 }, { -10, 10 }, { -13, 5 },
 	{ -14, 0 }, { -13, -5 }, { -10, -10 }, { -5, -13 }
 };
+
+static int stick_direction(int value, int center) {
+	int offset = value - center;
+	if (offset > -STICK_DEADZONE && offset < STICK_DEADZONE)
+		return 0;
+	if (offset > 0)
+		return offset > 72 ? PLAYER_SPEED : 1;
+	return offset < -72 ? -PLAYER_SPEED : -1;
+}
 
 static void setup_buffers(void) {
 	for (int i = 0; i < 2; i++) {
@@ -106,6 +117,12 @@ int main(void) {
 	int player_x = SCREEN_WIDTH / 2;
 	int player_y = SCREEN_HEIGHT / 2;
 	int active_buffer = 0;
+	int controller_type = -1;
+	int calibration_samples = 0;
+	int calibration_sum_x = 0;
+	int calibration_sum_y = 0;
+	int stick_center_x = 128;
+	int stick_center_y = 128;
 
 	for (;;) {
 		FrameBuffer *draw_buffer = &buffers[active_buffer];
@@ -118,15 +135,53 @@ int main(void) {
 			 pad->type == PAD_ID_ANALOG ||
 			 pad->type == PAD_ID_ANALOG_STICK);
 		uint16_t buttons = pad_ready ? pad->btn : 0xffff;
+		int move_x = 0;
+		int move_y = 0;
+		int analog_pad =
+			pad_ready &&
+			(pad->type == PAD_ID_ANALOG ||
+			 pad->type == PAD_ID_ANALOG_STICK);
+
+		if (pad_ready && pad->type != controller_type) {
+			controller_type = pad->type;
+			calibration_samples = 0;
+			calibration_sum_x = 0;
+			calibration_sum_y = 0;
+			stick_center_x = 128;
+			stick_center_y = 128;
+		}
+
+		if (analog_pad &&
+			calibration_samples < STICK_CALIBRATION_SAMPLES) {
+			calibration_sum_x += pad->ls_x;
+			calibration_sum_y += pad->ls_y;
+			calibration_samples++;
+			if (calibration_samples == STICK_CALIBRATION_SAMPLES) {
+				stick_center_x =
+					calibration_sum_x / STICK_CALIBRATION_SAMPLES;
+				stick_center_y =
+					calibration_sum_y / STICK_CALIBRATION_SAMPLES;
+			}
+		}
 
 		if (!(buttons & PAD_LEFT))
-			player_x -= PLAYER_SPEED;
-		if (!(buttons & PAD_RIGHT))
-			player_x += PLAYER_SPEED;
+			move_x = -PLAYER_SPEED;
+		else if (!(buttons & PAD_RIGHT))
+			move_x = PLAYER_SPEED;
+		else if (analog_pad &&
+			calibration_samples == STICK_CALIBRATION_SAMPLES)
+			move_x = stick_direction(pad->ls_x, stick_center_x);
+
 		if (!(buttons & PAD_UP))
-			player_y -= PLAYER_SPEED;
-		if (!(buttons & PAD_DOWN))
-			player_y += PLAYER_SPEED;
+			move_y = -PLAYER_SPEED;
+		else if (!(buttons & PAD_DOWN))
+			move_y = PLAYER_SPEED;
+		else if (analog_pad &&
+			calibration_samples == STICK_CALIBRATION_SAMPLES)
+			move_y = stick_direction(pad->ls_y, stick_center_y);
+
+		player_x += move_x;
+		player_y += move_y;
 
 		if (player_x < PLATFORM_LEFT + CIRCLE_RADIUS)
 			player_x = PLATFORM_LEFT + CIRCLE_RADIUS;
@@ -150,7 +205,12 @@ int main(void) {
 			packet,
 			8,
 			20,
-			pad_ready ? "D-PAD: MOVE CIRCLE" : "CONNECT CONTROLLER"
+			!pad_ready
+				? "CONNECT CONTROLLER"
+				: analog_pad &&
+					calibration_samples < STICK_CALIBRATION_SAMPLES
+					? "CENTER STICK TO CALIBRATE"
+					: "D-PAD / STICK: MOVE CIRCLE"
 		);
 
 		DrawSync(0);

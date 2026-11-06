@@ -1,7 +1,8 @@
 # PlayStation 1 - 2D-peli
 
-Ohjaa ympyrää alustalla PlayStation-ohjaimen ristiohjaimella tai DuckStationiin
-määritetyillä näppäimillä.
+Ohjaa ympyrää PlayStation-ohjaimen ristiohjaimella tai vasemmalla tatilla.
+Tatti kalibroidaan automaattisesti ohjaimen kytkemisen jälkeen; pidä se keskellä
+kalibrointitekstin näkyessä. Ristiohjain ei tarvitse kalibrointia.
 
 Käännä ja käynnistä peli projektin kansiosta:
 

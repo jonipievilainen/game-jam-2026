@@ -50,6 +50,8 @@ projektiin.
 ## Ohjaimet
 
 - Ohjaimen ristiohjain liikuttaa ympyrää alustalla.
+- Analogiohjaimen vasen tatti liikuttaa ympyrää. Tatti kalibroidaan automaattisesti
+  ohjaimen kytkemisen jälkeen: pidä se keskellä kalibrointitekstin ajan.
 
 Ympyrää voi liikuttaa myös DuckStationiin määritetyillä ristiohjaimen näppäimillä.
 
