@@ -13,17 +13,17 @@ typedef struct {
 } ModelFace;
 
 #include "car_model.h"
+#include "road.h"
 #include "wheel_texture.h"
 
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
-#define OT_LENGTH 1024
-#define CAMERA_TILT 256
-#define CAMERA_DEPTH 700
+#define OT_LENGTH 4096
+#define CAMERA_TILT 220
+#define CAMERA_DEPTH 650
 #define GROUND_HEIGHT 65
-#define GRID_LINES 16
-#define DRIVE_LIMIT_X 180
-#define DRIVE_LIMIT_Z 120
+#define ROAD_SEGMENTS 81
+#define ROAD_POLYGONS (ROAD_SEGMENTS * 4)
 #define FIXED_SCALE 4096
 #define BODY_SUBDIVISIONS 8
 #define BODY_GRID_VERTICES ((BODY_SUBDIVISIONS + 1) * (BODY_SUBDIVISIONS + 2) / 2)
@@ -38,7 +38,7 @@ typedef struct {
 		POLY_F3 flat;
 		POLY_FT3 textured;
 	} faces[MAX_MODEL_TRIANGLES];
-	LINE_F2 grid[GRID_LINES];
+	POLY_F4 road[ROAD_POLYGONS];
 } FrameBuffer;
 
 static FrameBuffer buffers[2];
@@ -101,51 +101,70 @@ static void init_body_mesh(void) {
 	}
 }
 
-static void draw_grid_line(FrameBuffer *buffer, int index, SVECTOR *start, SVECTOR *end) {
-	LINE_F2 *line = &buffer->grid[index];
-	int depth;
+static void draw_road_quad(
+	FrameBuffer *buffer, int *count, int near_x, int far_x, int near_z, int far_z,
+	int left, int right, int red, int green, int blue, int overlay
+) {
+	SVECTOR a = { near_x + left, GROUND_HEIGHT, near_z, 0 };
+	SVECTOR b = { near_x + right, GROUND_HEIGHT, near_z, 0 };
+	SVECTOR c = { far_x + left, GROUND_HEIGHT, far_z, 0 };
+	SVECTOR d = { far_x + right, GROUND_HEIGHT, far_z, 0 };
+	int za, zb, zc, zd, depth;
+	POLY_F4 *polygon = &buffer->road[*count];
 
-	gte_ldv3(start, end, end);
+	gte_ldv3(&a, &b, &c);
 	gte_rtpt();
-	gte_avsz3();
-	gte_stotz(&depth);
-	if (depth <= 0 || depth >= OT_LENGTH)
+	gte_stsxy0(&polygon->x0);
+	gte_stsxy1(&polygon->x1);
+	gte_stsxy2(&polygon->x2);
+	gte_ldv0(&d);
+	gte_rtps();
+	gte_stsxy(&polygon->x3);
+	gte_stsz4(&za, &zb, &zc, &zd);
+	if (za < 180 || zb < 180 || zc < 180 || zd < 180)
 		return;
-
-	setLineF2(line);
-	setRGB0(line, 72, 94, 103);
-	gte_stsxy0(&line->x0);
-	gte_stsxy1(&line->x1);
-	addPrim(&buffer->ordering_table[depth], line);
+	gte_avsz4();
+	gte_stotz(&depth);
+	if (depth <= 2 || depth >= OT_LENGTH)
+		return;
+	setPolyF4(polygon);
+	setRGB0(polygon, red, green, blue);
+	addPrim(&buffer->ordering_table[depth - overlay], polygon);
+	(*count)++;
 }
 
-static void draw_grid(FrameBuffer *buffer) {
-	SVECTOR camera_rotation = { CAMERA_TILT, 0, 0, 0 };
-	VECTOR camera_position = { 0, 0, CAMERA_DEPTH };
-	MATRIX camera;
-	int line = 0;
+static void draw_road(FrameBuffer *buffer, MATRIX *camera, int64_t car_x, int64_t car_z, uint32_t seed) {
+	int64_t first = road_segment_at(car_z) - ROAD_SEGMENTS / 2;
+	int count = 0;
 
-	RotMatrix(&camera_rotation, &camera);
-	TransMatrix(&camera, &camera_position);
-	gte_SetRotMatrix(&camera);
-	gte_SetTransMatrix(&camera);
-
-	for (int x = -400; x <= 400; x += 100) {
-		SVECTOR start = { x, GROUND_HEIGHT, -240, 0 };
-		SVECTOR end = { x, GROUND_HEIGHT, 240, 0 };
-		draw_grid_line(buffer, line++, &start, &end);
-	}
-	for (int z = -240; z <= 240; z += 80) {
-		SVECTOR start = { -400, GROUND_HEIGHT, z, 0 };
-		SVECTOR end = { 400, GROUND_HEIGHT, z, 0 };
-		draw_grid_line(buffer, line++, &start, &end);
+	gte_SetRotMatrix(camera);
+	gte_SetTransMatrix(camera);
+	for (int i = 0; i < ROAD_SEGMENTS; i++) {
+		int64_t segment = first + i;
+		int64_t x0 = road_center(segment, seed) - car_x;
+		int64_t x1 = road_center(segment + 1, seed) - car_x;
+		int64_t z0 = segment * ROAD_SEGMENT_LENGTH - car_z;
+		int64_t z1 = z0 + ROAD_SEGMENT_LENGTH;
+		if (x0 < -3000 || x0 > 3000 || x1 < -3000 || x1 > 3000)
+			continue;
+		draw_road_quad(buffer, &count, (int) x0, (int) x1, (int) z0, (int) z1,
+			-ROAD_HALF_WIDTH, ROAD_HALF_WIDTH, 62, 66, 70, 0);
+		draw_road_quad(buffer, &count, (int) x0, (int) x1, (int) z0, (int) z1,
+			-ROAD_HALF_WIDTH + 8, -ROAD_HALF_WIDTH + 16, 215, 215, 200, 1);
+		draw_road_quad(buffer, &count, (int) x0, (int) x1, (int) z0, (int) z1,
+			ROAD_HALF_WIDTH - 16, ROAD_HALF_WIDTH - 8, 215, 215, 200, 1);
+		if ((segment & 1) == 0)
+			draw_road_quad(buffer, &count, (int) x0, (int) x1, (int) z0, (int) z1,
+				-4, 4, 220, 202, 130, 1);
 	}
 }
 
 int main(void) {
-	SVECTOR rotation = { CAMERA_TILT, 0, 0, 0 };
-	int32_t car_x = 0;
-	int32_t car_z = 0;
+	SVECTOR car_rotation = { CAMERA_TILT, -1024, 0, 0 };
+	int heading = 0;
+	int64_t car_x = 0;
+	int64_t car_z = 0;
+	uint32_t road_seed;
 	int active_buffer = 0;
 
 	ResetGraph(0);
@@ -153,14 +172,14 @@ int main(void) {
 		int y = i * SCREEN_HEIGHT;
 		SetDefDrawEnv(&buffers[i].draw, 0, y, SCREEN_WIDTH, SCREEN_HEIGHT);
 		SetDefDispEnv(&buffers[i].display, 0, y, SCREEN_WIDTH, SCREEN_HEIGHT);
-		setRGB0(&buffers[i].draw, 18, 24, 38);
+		setRGB0(&buffers[i].draw, 42, 94, 54);
 		buffers[i].draw.isbg = 1;
 	}
 
 	InitGeom();
 	init_body_mesh();
 	gte_SetGeomOffset(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-	gte_SetGeomScreen(220);
+	gte_SetGeomScreen(180);
 	gte_SetBackColor(64, 64, 64);
 	gte_SetColorMatrix(&color_matrix);
 	init_wheel_texture();
@@ -168,6 +187,7 @@ int main(void) {
 	StartPAD();
 	ChangeClearPAD(0);
 	SetDispMask(1);
+	road_seed = (uint32_t) VSync(-1);
 
 	for (;;) {
 		FrameBuffer *draw_buffer = &buffers[active_buffer];
@@ -180,35 +200,25 @@ int main(void) {
 		uint16_t buttons = pad_ready ? pad->btn : 0xffff;
 		int drive = (!(buttons & PAD_UP)) - (!(buttons & PAD_DOWN));
 		int steer = (!(buttons & PAD_RIGHT)) - (!(buttons & PAD_LEFT));
-		int x;
-		int z;
-		VECTOR position;
+		SVECTOR camera_rotation = { CAMERA_TILT, 0, 0, 0 };
+		VECTOR position = { 0, 75, CAMERA_DEPTH };
+		MATRIX camera;
 		MATRIX transform;
 		MATRIX lighting;
 		int packet_count = 0;
 
 		if (drive) {
-			rotation.vy = (rotation.vy + steer * drive * 20) & 4095;
-			car_x += drive * 4 * icos(rotation.vy);
-			car_z -= drive * 4 * isin(rotation.vy);
-			if (car_x < -DRIVE_LIMIT_X * FIXED_SCALE)
-				car_x = -DRIVE_LIMIT_X * FIXED_SCALE;
-			if (car_x > DRIVE_LIMIT_X * FIXED_SCALE)
-				car_x = DRIVE_LIMIT_X * FIXED_SCALE;
-			if (car_z < -DRIVE_LIMIT_Z * FIXED_SCALE)
-				car_z = -DRIVE_LIMIT_Z * FIXED_SCALE;
-			if (car_z > DRIVE_LIMIT_Z * FIXED_SCALE)
-				car_z = DRIVE_LIMIT_Z * FIXED_SCALE;
+			heading = (heading + steer * drive * 20) & 4095;
+			car_x += drive * 4 * isin(heading);
+			car_z += drive * 4 * icos(heading);
 		}
-		x = car_x / FIXED_SCALE;
-		z = car_z / FIXED_SCALE;
-		position.vx = x;
-		position.vy = -(z * isin(CAMERA_TILT)) / FIXED_SCALE;
-		position.vz = CAMERA_DEPTH + (z * icos(CAMERA_TILT)) / FIXED_SCALE;
 
 		ClearOTagR(draw_buffer->ordering_table, OT_LENGTH);
-		draw_grid(draw_buffer);
-		RotMatrix(&rotation, &transform);
+		camera_rotation.vy = -heading;
+		RotMatrix(&camera_rotation, &camera);
+		TransMatrix(&camera, &position);
+		draw_road(draw_buffer, &camera, car_x / FIXED_SCALE, car_z / FIXED_SCALE, road_seed);
+		RotMatrix(&car_rotation, &transform);
 		TransMatrix(&transform, &position);
 		MulMatrix0(&light_matrix, &transform, &lighting);
 		gte_SetRotMatrix(&transform);

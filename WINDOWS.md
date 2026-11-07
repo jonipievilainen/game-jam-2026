@@ -36,7 +36,9 @@ tallennustilan, käynnistä uusi käännös valitsemalla **System > Restart Game
 
 Nuoli ylös ajaa eteenpäin ja nuoli alas peruuttaa. Nuolilla vasemmalle ja
 oikealle käännetään ajon aikana; peruuttaessa ohjaus kääntyy päinvastaiseksi.
-Auto pysyy rajatulla ajoalueella. DuckStationissa näppäimistön nuolet on
+Kamera seuraa auton takaa. Tie muodostetaan ajon aikana, mutkittelee
+satunnaisesti ja jatkuu eteenpäin; myös peruuttaminen on mahdollista.
+Tie pysyy samana, kun palaat aiempaan kohtaan. DuckStationissa näppäimistön nuolet on
 asetettava ohjaimen 1 ristiohjaimen näppäimiksi (Settings > Controllers).
 Myös PlayStation-ohjaimen ristiohjain toimii.
 
