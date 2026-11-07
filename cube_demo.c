@@ -1,6 +1,8 @@
 #include <stdint.h>
+#include <psxapi.h>
 #include <psxgpu.h>
 #include <psxgte.h>
+#include <psxpad.h>
 #include <inline_c.h>
 
 typedef struct {
@@ -13,15 +15,24 @@ typedef struct {
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
 #define OT_LENGTH 1024
+#define CAMERA_TILT 256
+#define CAMERA_DEPTH 700
+#define GROUND_HEIGHT 65
+#define GRID_LINES 16
+#define DRIVE_LIMIT_X 180
+#define DRIVE_LIMIT_Z 120
+#define FIXED_SCALE 4096
 
 typedef struct {
 	DISPENV display;
 	DRAWENV draw;
 	uint32_t ordering_table[OT_LENGTH];
 	POLY_F3 faces[CAR_FACE_COUNT];
+	LINE_F2 grid[GRID_LINES];
 } FrameBuffer;
 
 static FrameBuffer buffers[2];
+static uint8_t pad_buffers[2][34];
 
 static MATRIX light_matrix = {
 	-2048, -2896, -2048,
@@ -35,9 +46,51 @@ static MATRIX color_matrix = {
 	ONE * 3 / 4, 0, 0
 };
 
+static void draw_grid_line(FrameBuffer *buffer, int index, SVECTOR *start, SVECTOR *end) {
+	LINE_F2 *line = &buffer->grid[index];
+	int depth;
+
+	gte_ldv3(start, end, end);
+	gte_rtpt();
+	gte_avsz3();
+	gte_stotz(&depth);
+	if (depth <= 0 || depth >= OT_LENGTH)
+		return;
+
+	setLineF2(line);
+	setRGB0(line, 72, 94, 103);
+	gte_stsxy0(&line->x0);
+	gte_stsxy1(&line->x1);
+	addPrim(&buffer->ordering_table[depth], line);
+}
+
+static void draw_grid(FrameBuffer *buffer) {
+	SVECTOR camera_rotation = { CAMERA_TILT, 0, 0, 0 };
+	VECTOR camera_position = { 0, 0, CAMERA_DEPTH };
+	MATRIX camera;
+	int line = 0;
+
+	RotMatrix(&camera_rotation, &camera);
+	TransMatrix(&camera, &camera_position);
+	gte_SetRotMatrix(&camera);
+	gte_SetTransMatrix(&camera);
+
+	for (int x = -400; x <= 400; x += 100) {
+		SVECTOR start = { x, GROUND_HEIGHT, -240, 0 };
+		SVECTOR end = { x, GROUND_HEIGHT, 240, 0 };
+		draw_grid_line(buffer, line++, &start, &end);
+	}
+	for (int z = -240; z <= 240; z += 80) {
+		SVECTOR start = { -400, GROUND_HEIGHT, z, 0 };
+		SVECTOR end = { 400, GROUND_HEIGHT, z, 0 };
+		draw_grid_line(buffer, line++, &start, &end);
+	}
+}
+
 int main(void) {
-	SVECTOR rotation = { 192, 0, 0, 0 };
-	VECTOR position = { 0, 0, 500 };
+	SVECTOR rotation = { CAMERA_TILT, 0, 0, 0 };
+	int32_t car_x = 0;
+	int32_t car_z = 0;
 	int active_buffer = 0;
 
 	ResetGraph(0);
@@ -54,16 +107,50 @@ int main(void) {
 	gte_SetGeomScreen(220);
 	gte_SetBackColor(64, 64, 64);
 	gte_SetColorMatrix(&color_matrix);
+	InitPAD(pad_buffers[0], sizeof(pad_buffers[0]), pad_buffers[1], sizeof(pad_buffers[1]));
+	StartPAD();
+	ChangeClearPAD(0);
 	SetDispMask(1);
 
 	for (;;) {
 		FrameBuffer *draw_buffer = &buffers[active_buffer];
 		FrameBuffer *display_buffer = &buffers[active_buffer ^ 1];
+		volatile PADTYPE *pad = (volatile PADTYPE *) pad_buffers[0];
+		int pad_ready = !pad->stat &&
+			(pad->type == PAD_ID_DIGITAL ||
+			 pad->type == PAD_ID_ANALOG ||
+			 pad->type == PAD_ID_ANALOG_STICK);
+		uint16_t buttons = pad_ready ? pad->btn : 0xffff;
+		int drive = (!(buttons & PAD_UP)) - (!(buttons & PAD_DOWN));
+		int steer = (!(buttons & PAD_RIGHT)) - (!(buttons & PAD_LEFT));
+		int x;
+		int z;
+		VECTOR position;
 		MATRIX transform;
 		MATRIX lighting;
 		int packet_count = 0;
 
+		if (drive) {
+			rotation.vy = (rotation.vy + steer * drive * 20) & 4095;
+			car_x += drive * 4 * icos(rotation.vy);
+			car_z -= drive * 4 * isin(rotation.vy);
+			if (car_x < -DRIVE_LIMIT_X * FIXED_SCALE)
+				car_x = -DRIVE_LIMIT_X * FIXED_SCALE;
+			if (car_x > DRIVE_LIMIT_X * FIXED_SCALE)
+				car_x = DRIVE_LIMIT_X * FIXED_SCALE;
+			if (car_z < -DRIVE_LIMIT_Z * FIXED_SCALE)
+				car_z = -DRIVE_LIMIT_Z * FIXED_SCALE;
+			if (car_z > DRIVE_LIMIT_Z * FIXED_SCALE)
+				car_z = DRIVE_LIMIT_Z * FIXED_SCALE;
+		}
+		x = car_x / FIXED_SCALE;
+		z = car_z / FIXED_SCALE;
+		position.vx = x;
+		position.vy = -(z * isin(CAMERA_TILT)) / FIXED_SCALE;
+		position.vz = CAMERA_DEPTH + (z * icos(CAMERA_TILT)) / FIXED_SCALE;
+
 		ClearOTagR(draw_buffer->ordering_table, OT_LENGTH);
+		draw_grid(draw_buffer);
 		RotMatrix(&rotation, &transform);
 		TransMatrix(&transform, &position);
 		MulMatrix0(&light_matrix, &transform, &lighting);
@@ -112,6 +199,5 @@ int main(void) {
 		PutDispEnv(&display_buffer->display);
 		DrawOTagEnv(&draw_buffer->ordering_table[OT_LENGTH - 1], &draw_buffer->draw);
 		active_buffer ^= 1;
-		rotation.vy = (rotation.vy + 8) & 4095;
 	}
 }

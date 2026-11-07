@@ -17,7 +17,7 @@ DuckStationissa:
 .\run.ps1
 ```
 
-Pyörivän 3D-automallin demo käännetään samalla ja käynnistetään komennolla:
+Ajettavan 3D-automallin demo käännetään samalla ja käynnistetään komennolla:
 
 ```powershell
 .\run.ps1 -CarDemo
@@ -30,7 +30,14 @@ käytössä. Korille ja renkaille asetetaan erilliset värit. Levykuvan vanha ni
 säilyy yhteensopivuuden vuoksi: Linuxissa se on `build/cube_demo.cue`, ja
 Windowsissa myös `.\run.ps1 -CubeDemo` toimii.
 Sulje demo DuckStationissa ennen uutta käännöstä, jotta Windows vapauttaa
-levykuvatiedoston kirjoittamista varten.
+levykuvatiedoston kirjoittamista varten. Jos DuckStation palauttaa vanhan
+tallennustilan, käynnistä uusi käännös valitsemalla **System > Restart Game**.
+
+Nuoli ylös ajaa eteenpäin ja nuoli alas peruuttaa. Nuolilla vasemmalle ja
+oikealle käännetään ajon aikana; peruuttaessa ohjaus kääntyy päinvastaiseksi.
+Auto pysyy rajatulla ajoalueella. DuckStationissa näppäimistön nuolet on
+asetettava ohjaimen 1 ristiohjaimen näppäimiksi (Settings > Controllers).
+Myös PlayStation-ohjaimen ristiohjain toimii.
 
 VS Coden **Run and Debug** -näkymässä valitse
 **PS1: Run and Debug in DuckStation (Windows)** ja paina F5. `setup.ps1`
