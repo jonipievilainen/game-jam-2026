@@ -320,7 +320,7 @@ int main(void) {
 			car_x += (int64_t) speed * isin(heading) / DRIVING_SPEED_SCALE;
 			car_z += (int64_t) speed * icos(heading) / DRIVING_SPEED_SCALE;
 		}
-		engine_sound_update(speed, drive, now);
+		engine_sound_update(speed, drive);
 
 		ClearOTagR(draw_buffer->ordering_table, OT_LENGTH);
 		draw_sky(draw_buffer, heading);

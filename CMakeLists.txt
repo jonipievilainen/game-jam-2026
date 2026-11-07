@@ -28,6 +28,7 @@ add_custom_command(
 
 psn00bsdk_add_executable(cube_demo GPREL cube_demo.c driving.c road.c body_texture.c wheel_texture.c engine_sound.c "${CMAKE_CURRENT_BINARY_DIR}/car_model.h")
 target_include_directories(cube_demo PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+psn00bsdk_target_incbin(cube_demo PRIVATE rally_engine assets/rally_engine.adpcm)
 
 psn00bsdk_add_cd_image(
 	cube_iso

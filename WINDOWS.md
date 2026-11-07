@@ -39,8 +39,12 @@ tallennustilan, käynnistä uusi käännös valitsemalla **System > Restart Game
 Nuoli ylös kiihdyttää eteenpäin ja nuoli alas jarruttaa ja peruuttaa.
 Vapautettaessa kaasun auto hidastuu vähitellen pysähdyksiin. Nuolilla vasemmalle
 ja oikealle käännetään ajon aikana; peruuttaessa ohjaus kääntyy päinvastaiseksi.
-Autossa kuuluu nopeuden mukaan muuttuva moottoriääni ja peruutusmerkkiääni.
+Autossa kuuluu nopeuden ja kaasun mukaan muuttuva kilpa-auton moottoriääni.
 Äänenvoimakkuutta voi säätää DuckStationin ääniasetuksissa.
+Äänisilmukka perustuu käyttäjän domasx2
+[racing car engine sound loops](https://opengameart.org/content/racing-car-engine-sound-loops)
+-äänitteeseen (CC0 1.0); se on muunnettu monoksi, 22 050 Hz:n
+näytteenottotaajuudelle ja PS1:n ADPCM-muotoon sekä häivytetty silmukaksi.
 Kamera seuraa auton takaa. Tie muodostetaan ajon aikana, mutkittelee
 satunnaisesti ja jatkuu eteenpäin; myös peruuttaminen on mahdollista.
 Tie pysyy samana, kun palaat aiempaan kohtaan. DuckStationissa näppäimistön nuolet on
