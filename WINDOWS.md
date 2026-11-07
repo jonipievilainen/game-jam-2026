@@ -36,8 +36,9 @@ Sulje demo DuckStationissa ennen uutta käännöstä, jotta Windows vapauttaa
 levykuvatiedoston kirjoittamista varten. Jos DuckStation palauttaa vanhan
 tallennustilan, käynnistä uusi käännös valitsemalla **System > Restart Game**.
 
-Nuoli ylös ajaa eteenpäin ja nuoli alas peruuttaa. Nuolilla vasemmalle ja
-oikealle käännetään ajon aikana; peruuttaessa ohjaus kääntyy päinvastaiseksi.
+Nuoli ylös kiihdyttää eteenpäin ja nuoli alas jarruttaa ja peruuttaa.
+Vapautettaessa kaasun auto hidastuu vähitellen pysähdyksiin. Nuolilla vasemmalle
+ja oikealle käännetään ajon aikana; peruuttaessa ohjaus kääntyy päinvastaiseksi.
 Kamera seuraa auton takaa. Tie muodostetaan ajon aikana, mutkittelee
 satunnaisesti ja jatkuu eteenpäin; myös peruuttaminen on mahdollista.
 Tie pysyy samana, kun palaat aiempaan kohtaan. DuckStationissa näppäimistön nuolet on

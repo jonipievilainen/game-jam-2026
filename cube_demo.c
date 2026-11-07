@@ -14,6 +14,7 @@ typedef struct {
 
 #include "car_model.h"
 #include "body_texture.h"
+#include "driving.h"
 #include "road.h"
 #include "wheel_texture.h"
 
@@ -256,9 +257,11 @@ static void draw_road(FrameBuffer *buffer, MATRIX *camera, int64_t car_x, int64_
 int main(void) {
 	SVECTOR car_rotation = { CAMERA_TILT, -1024, 0, 0 };
 	int heading = 0;
+	int speed = 0;
 	int64_t car_x = 0;
 	int64_t car_z = 0;
 	uint32_t road_seed;
+	uint32_t last_tick;
 	int active_buffer = 0;
 
 	ResetGraph(0);
@@ -284,6 +287,7 @@ int main(void) {
 	ChangeClearPAD(0);
 	SetDispMask(1);
 	road_seed = (uint32_t) VSync(-1);
+	last_tick = road_seed;
 
 	for (;;) {
 		FrameBuffer *draw_buffer = &buffers[active_buffer];
@@ -303,10 +307,16 @@ int main(void) {
 		MATRIX lighting;
 		int packet_count = 0;
 
-		if (drive) {
-			heading = (heading + steer * drive * 20) & 4095;
-			car_x += drive * 4 * isin(heading);
-			car_z += drive * 4 * icos(heading);
+		uint32_t now = (uint32_t) VSync(-1);
+		uint32_t ticks = now - last_tick;
+		last_tick = now;
+		if (ticks > 6)
+			ticks = 6;
+		while (ticks--) {
+			speed = driving_speed_step(speed, drive);
+			heading = (heading + driving_steering_step(speed, steer)) & 4095;
+			car_x += (int64_t) speed * isin(heading) / DRIVING_SPEED_SCALE;
+			car_z += (int64_t) speed * icos(heading) / DRIVING_SPEED_SCALE;
 		}
 
 		ClearOTagR(draw_buffer->ordering_table, OT_LENGTH);
