@@ -13,17 +13,21 @@ typedef struct {
 } ModelFace;
 
 #include "car_model.h"
+#include "body_texture.h"
 #include "road.h"
 #include "wheel_texture.h"
 
-#define SCREEN_WIDTH 320
+#define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 240
 #define OT_LENGTH 4096
 #define CAMERA_TILT 220
 #define CAMERA_DEPTH 650
 #define GROUND_HEIGHT 65
 #define ROAD_SEGMENTS 81
-#define ROAD_POLYGONS (ROAD_SEGMENTS * 4)
+#define ROAD_POLYGONS (ROAD_SEGMENTS * 6)
+#define ROAD_DEPTH_BIAS 1024
+#define POST_POLYGONS (((ROAD_SEGMENTS + 3) / 4) * 4)
+#define MOUNTAIN_COUNT 17
 #define FIXED_SCALE 4096
 #define BODY_SUBDIVISIONS 8
 #define BODY_GRID_VERTICES ((BODY_SUBDIVISIONS + 1) * (BODY_SUBDIVISIONS + 2) / 2)
@@ -39,6 +43,9 @@ typedef struct {
 		POLY_FT3 textured;
 	} faces[MAX_MODEL_TRIANGLES];
 	POLY_F4 road[ROAD_POLYGONS];
+	POLY_F4 posts[POST_POLYGONS];
+	POLY_G4 sky;
+	POLY_F3 mountains[MOUNTAIN_COUNT];
 } FrameBuffer;
 
 static FrameBuffer buffers[2];
@@ -101,6 +108,76 @@ static void init_body_mesh(void) {
 	}
 }
 
+static void body_uv(const SVECTOR *vertex, const SVECTOR *normal, uint8_t *u, uint8_t *v) {
+	int horizontal;
+	int panel;
+	if (normal->vx) {
+		horizontal = (vertex->vz + 90) * 127 / 180;
+		panel = normal->vx < 0 ? 0 : 1;
+	} else {
+		horizontal = (vertex->vx + 160) * 127 / 320;
+		panel = 2;
+	}
+	*u = (uint8_t) horizontal;
+	*v = (uint8_t) (panel * 32 + (vertex->vy + 70) * 31 / 120);
+}
+
+static void draw_sky(FrameBuffer *buffer, int heading) {
+	static const int peaks[] = { 58, 48, 63, 53, 60, 45, 59, 51 };
+	POLY_G4 *sky = &buffer->sky;
+	setPolyG4(sky);
+	setXY4(sky, 0, 0, SCREEN_WIDTH, 0, 0, 76, SCREEN_WIDTH, 76);
+	setRGB0(sky, 43, 95, 155);
+	setRGB1(sky, 43, 95, 155);
+	setRGB2(sky, 161, 197, 211);
+	setRGB3(sky, 161, 197, 211);
+	addPrim(&buffer->ordering_table[OT_LENGTH - 1], sky);
+	for (int i = 0; i < MOUNTAIN_COUNT; i++) {
+		POLY_F3 *mountain = &buffer->mountains[i];
+		int offset = heading * 1280 / 4096;
+		int x = i * 160 - 160 - offset;
+		if (x > SCREEN_WIDTH || x + 160 < 0)
+			continue;
+		setPolyF3(mountain);
+		setXY3(mountain, x, 76, x + 80, peaks[i % 8], x + 160, 76);
+		setRGB0(mountain, 94, 135, 131);
+		addPrim(&buffer->ordering_table[OT_LENGTH - 2], mountain);
+	}
+}
+
+static void draw_post_quad(FrameBuffer *buffer, int *count, int x, int z, int top, int bottom, int red, int green, int blue) {
+	SVECTOR a = { x - 5, top, z, 0 };
+	SVECTOR b = { x + 5, top, z, 0 };
+	SVECTOR c = { x - 5, bottom, z, 0 };
+	SVECTOR d = { x + 5, bottom, z, 0 };
+	int za, zb, zc, zd, depth;
+	POLY_F4 *polygon = &buffer->posts[*count];
+
+	gte_ldv3(&a, &b, &c);
+	gte_rtpt();
+	gte_stsxy0(&polygon->x0);
+	gte_stsxy1(&polygon->x1);
+	gte_stsxy2(&polygon->x2);
+	gte_ldv0(&d);
+	gte_rtps();
+	gte_stsxy(&polygon->x3);
+	gte_stsz4(&za, &zb, &zc, &zd);
+	if (za < 180 || zb < 180 || zc < 180 || zd < 180)
+		return;
+	gte_avsz4();
+	gte_stotz(&depth);
+	if (depth <= 2 || depth >= OT_LENGTH - 1)
+		return;
+	polygon->y0 /= 2;
+	polygon->y1 /= 2;
+	polygon->y2 /= 2;
+	polygon->y3 /= 2;
+	setPolyF4(polygon);
+	setRGB0(polygon, red, green, blue);
+	addPrim(&buffer->ordering_table[depth - 1], polygon);
+	(*count)++;
+}
+
 static void draw_road_quad(
 	FrameBuffer *buffer, int *count, int near_x, int far_x, int near_z, int far_z,
 	int left, int right, int red, int green, int blue, int overlay
@@ -121,21 +198,27 @@ static void draw_road_quad(
 	gte_rtps();
 	gte_stsxy(&polygon->x3);
 	gte_stsz4(&za, &zb, &zc, &zd);
+	polygon->y0 /= 2;
+	polygon->y1 /= 2;
+	polygon->y2 /= 2;
+	polygon->y3 /= 2;
 	if (za < 180 || zb < 180 || zc < 180 || zd < 180)
 		return;
 	gte_avsz4();
 	gte_stotz(&depth);
-	if (depth <= 2 || depth >= OT_LENGTH)
+	if (depth <= 2 || depth + ROAD_DEPTH_BIAS >= OT_LENGTH - 2)
 		return;
 	setPolyF4(polygon);
 	setRGB0(polygon, red, green, blue);
-	addPrim(&buffer->ordering_table[depth - overlay], polygon);
+	/* Ground must be drawn behind the car, even when a road quad crosses its depth. */
+	addPrim(&buffer->ordering_table[depth + ROAD_DEPTH_BIAS - overlay], polygon);
 	(*count)++;
 }
 
 static void draw_road(FrameBuffer *buffer, MATRIX *camera, int64_t car_x, int64_t car_z, uint32_t seed) {
 	int64_t first = road_segment_at(car_z) - ROAD_SEGMENTS / 2;
 	int count = 0;
+	int post_count = 0;
 
 	gte_SetRotMatrix(camera);
 	gte_SetTransMatrix(camera);
@@ -148,6 +231,10 @@ static void draw_road(FrameBuffer *buffer, MATRIX *camera, int64_t car_x, int64_
 		if (x0 < -3000 || x0 > 3000 || x1 < -3000 || x1 > 3000)
 			continue;
 		draw_road_quad(buffer, &count, (int) x0, (int) x1, (int) z0, (int) z1,
+			-ROAD_HALF_WIDTH - 48, -ROAD_HALF_WIDTH, 116, 105, 78, 0);
+		draw_road_quad(buffer, &count, (int) x0, (int) x1, (int) z0, (int) z1,
+			ROAD_HALF_WIDTH, ROAD_HALF_WIDTH + 48, 116, 105, 78, 0);
+		draw_road_quad(buffer, &count, (int) x0, (int) x1, (int) z0, (int) z1,
 			-ROAD_HALF_WIDTH, ROAD_HALF_WIDTH, 62, 66, 70, 0);
 		draw_road_quad(buffer, &count, (int) x0, (int) x1, (int) z0, (int) z1,
 			-ROAD_HALF_WIDTH + 8, -ROAD_HALF_WIDTH + 16, 215, 215, 200, 1);
@@ -156,6 +243,13 @@ static void draw_road(FrameBuffer *buffer, MATRIX *camera, int64_t car_x, int64_
 		if ((segment & 1) == 0)
 			draw_road_quad(buffer, &count, (int) x0, (int) x1, (int) z0, (int) z1,
 				-4, 4, 220, 202, 130, 1);
+		if (segment % 4 == 0) {
+			for (int side = -1; side <= 1; side += 2) {
+				int post_x = (int) x0 + side * (ROAD_HALF_WIDTH + 58);
+				draw_post_quad(buffer, &post_count, post_x, (int) z0, 10, GROUND_HEIGHT, 225, 222, 203);
+				draw_post_quad(buffer, &post_count, post_x, (int) z0, -5, 10, 184, 47, 35);
+			}
+		}
 	}
 }
 
@@ -172,17 +266,19 @@ int main(void) {
 		int y = i * SCREEN_HEIGHT;
 		SetDefDrawEnv(&buffers[i].draw, 0, y, SCREEN_WIDTH, SCREEN_HEIGHT);
 		SetDefDispEnv(&buffers[i].display, 0, y, SCREEN_WIDTH, SCREEN_HEIGHT);
-		setRGB0(&buffers[i].draw, 42, 94, 54);
+		setRGB0(&buffers[i].draw, 63, 107, 57);
 		buffers[i].draw.isbg = 1;
+		buffers[i].draw.dtd = 1;
 	}
 
 	InitGeom();
 	init_body_mesh();
-	gte_SetGeomOffset(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
-	gte_SetGeomScreen(180);
+	gte_SetGeomOffset(SCREEN_WIDTH / 2, SCREEN_HEIGHT);
+	gte_SetGeomScreen(360);
 	gte_SetBackColor(64, 64, 64);
 	gte_SetColorMatrix(&color_matrix);
 	init_wheel_texture();
+	init_body_texture();
 	InitPAD(pad_buffers[0], sizeof(pad_buffers[0]), pad_buffers[1], sizeof(pad_buffers[1]));
 	StartPAD();
 	ChangeClearPAD(0);
@@ -214,6 +310,7 @@ int main(void) {
 		}
 
 		ClearOTagR(draw_buffer->ordering_table, OT_LENGTH);
+		draw_sky(draw_buffer, heading);
 		camera_rotation.vy = -heading;
 		RotMatrix(&camera_rotation, &camera);
 		TransMatrix(&camera, &position);
@@ -257,16 +354,30 @@ int main(void) {
 				if (depth <= 0 || depth >= OT_LENGTH)
 					continue;
 
-				if (face->textured) {
+				if (face->textured || (i < CAR_BODY_FACE_COUNT &&
+					(car_normals[i].vx || car_normals[i].vz))) {
 					POLY_FT3 *polygon = &draw_buffer->faces[packet_count].textured;
+					uint8_t uv[3][2];
 					setPolyFT3(polygon);
-					setRGB0(polygon, face->color[0], face->color[1], face->color[2]);
-					setUV3(polygon, face->uv[0][0], face->uv[0][1],
-						face->uv[1][0], face->uv[1][1], face->uv[2][0], face->uv[2][1]);
-					polygon->tpage = getTPage(2, 0, 640, 0);
+					if (face->textured) {
+						setRGB0(polygon, face->color[0], face->color[1], face->color[2]);
+						setUV3(polygon, face->uv[0][0], face->uv[0][1],
+							face->uv[1][0], face->uv[1][1], face->uv[2][0], face->uv[2][1]);
+						polygon->tpage = getTPage(2, 0, 640, 0);
+					} else {
+						body_uv(a, &car_normals[i], &uv[0][0], &uv[0][1]);
+						body_uv(b, &car_normals[i], &uv[1][0], &uv[1][1]);
+						body_uv(c, &car_normals[i], &uv[2][0], &uv[2][1]);
+						setRGB0(polygon, 128, 128, 128);
+						setUV3(polygon, uv[0][0], uv[0][1], uv[1][0], uv[1][1], uv[2][0], uv[2][1]);
+						polygon->tpage = getTPage(2, 0, 768, 0);
+					}
 					gte_stsxy0(&polygon->x0);
 					gte_stsxy1(&polygon->x1);
 					gte_stsxy2(&polygon->x2);
+					polygon->y0 /= 2;
+					polygon->y1 /= 2;
+					polygon->y2 /= 2;
 					gte_ldrgb(&polygon->r0);
 					gte_ldv0(&car_normals[i]);
 					gte_nccs();
@@ -279,6 +390,10 @@ int main(void) {
 					gte_stsxy0(&polygon->x0);
 					gte_stsxy1(&polygon->x1);
 					gte_stsxy2(&polygon->x2);
+					polygon->y0 /= 2;
+					polygon->y1 /= 2;
+					polygon->y2 /= 2;
+					setRGB0(polygon, 48, 112, 184);
 					gte_ldrgb(&polygon->r0);
 					gte_ldv0(&car_normals[i]);
 					gte_nccs();
