@@ -26,7 +26,7 @@ add_custom_command(
 	VERBATIM
 )
 
-psn00bsdk_add_executable(cube_demo GPREL cube_demo.c "${CMAKE_CURRENT_BINARY_DIR}/car_model.h")
+psn00bsdk_add_executable(cube_demo GPREL cube_demo.c wheel_texture.c "${CMAKE_CURRENT_BINARY_DIR}/car_model.h")
 target_include_directories(cube_demo PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 psn00bsdk_add_cd_image(

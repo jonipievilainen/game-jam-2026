@@ -24,9 +24,10 @@ Ajettavan 3D-automallin demo käännetään samalla ja käynnistetään komennol
 ```
 
 Demo yhdistää `car`-kansion korin ja neljän renkaan OBJ-geometriat ja käyttää
-niiden normaaleja valaistukseen. Geometria muunnetaan automaattisesti
-käännöksen yhteydessä; MTL-materiaalit ja tekstuurikoordinaatit eivät ole
-käytössä. Korille ja renkaille asetetaan erilliset värit. Levykuvan vanha nimi
+niiden normaaleja valaistukseen. Renkaiden OBJ-tekstuurikoordinaatit sovitetaan
+automaattisesti `wheel_texture.c`-tiedostossa luotuun rengas- ja
+vannetekstuuriin. Korin väri määritetään koodissa; MTL-materiaalit eivät ole
+käytössä. Levykuvan vanha nimi
 säilyy yhteensopivuuden vuoksi: Linuxissa se on `build/cube_demo.cue`, ja
 Windowsissa myös `.\run.ps1 -CubeDemo` toimii.
 Sulje demo DuckStationissa ennen uutta käännöstä, jotta Windows vapauttaa

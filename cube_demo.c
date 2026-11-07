@@ -8,9 +8,12 @@
 typedef struct {
 	uint16_t vertices[3];
 	uint8_t color[3];
+	uint8_t textured;
+	uint8_t uv[3][2];
 } ModelFace;
 
 #include "car_model.h"
+#include "wheel_texture.h"
 
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
@@ -27,7 +30,10 @@ typedef struct {
 	DISPENV display;
 	DRAWENV draw;
 	uint32_t ordering_table[OT_LENGTH];
-	POLY_F3 faces[CAR_FACE_COUNT];
+	union {
+		POLY_F3 flat;
+		POLY_FT3 textured;
+	} faces[CAR_FACE_COUNT];
 	LINE_F2 grid[GRID_LINES];
 } FrameBuffer;
 
@@ -107,6 +113,7 @@ int main(void) {
 	gte_SetGeomScreen(220);
 	gte_SetBackColor(64, 64, 64);
 	gte_SetColorMatrix(&color_matrix);
+	init_wheel_texture();
 	InitPAD(pad_buffers[0], sizeof(pad_buffers[0]), pad_buffers[1], sizeof(pad_buffers[1]));
 	StartPAD();
 	ChangeClearPAD(0);
@@ -160,7 +167,6 @@ int main(void) {
 
 		for (int i = 0; i < CAR_FACE_COUNT; i++) {
 			const ModelFace *face = &car_faces[i];
-			POLY_F3 *polygon;
 			int facing;
 			int depth;
 
@@ -180,17 +186,34 @@ int main(void) {
 			if (depth <= 0 || depth >= OT_LENGTH)
 				continue;
 
-			polygon = &draw_buffer->faces[packet_count];
-			setPolyF3(polygon);
-			setRGB0(polygon, face->color[0], face->color[1], face->color[2]);
-			gte_stsxy0(&polygon->x0);
-			gte_stsxy1(&polygon->x1);
-			gte_stsxy2(&polygon->x2);
-			gte_ldrgb(&polygon->r0);
-			gte_ldv0(&car_normals[i]);
-			gte_nccs();
-			gte_strgb(&polygon->r0);
-			addPrim(&draw_buffer->ordering_table[depth], polygon);
+			if (face->textured) {
+				POLY_FT3 *polygon = &draw_buffer->faces[packet_count].textured;
+				setPolyFT3(polygon);
+				setRGB0(polygon, face->color[0], face->color[1], face->color[2]);
+				setUV3(polygon, face->uv[0][0], face->uv[0][1],
+					face->uv[1][0], face->uv[1][1], face->uv[2][0], face->uv[2][1]);
+				polygon->tpage = getTPage(2, 0, 640, 0);
+				gte_stsxy0(&polygon->x0);
+				gte_stsxy1(&polygon->x1);
+				gte_stsxy2(&polygon->x2);
+				gte_ldrgb(&polygon->r0);
+				gte_ldv0(&car_normals[i]);
+				gte_nccs();
+				gte_strgb(&polygon->r0);
+				addPrim(&draw_buffer->ordering_table[depth], polygon);
+			} else {
+				POLY_F3 *polygon = &draw_buffer->faces[packet_count].flat;
+				setPolyF3(polygon);
+				setRGB0(polygon, face->color[0], face->color[1], face->color[2]);
+				gte_stsxy0(&polygon->x0);
+				gte_stsxy1(&polygon->x1);
+				gte_stsxy2(&polygon->x2);
+				gte_ldrgb(&polygon->r0);
+				gte_ldv0(&car_normals[i]);
+				gte_nccs();
+				gte_strgb(&polygon->r0);
+				addPrim(&draw_buffer->ordering_table[depth], polygon);
+			}
 			packet_count++;
 		}
 
