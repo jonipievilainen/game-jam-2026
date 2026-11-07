@@ -122,6 +122,9 @@ foreach(mesh IN ITEMS Car Weel1 Weel2 Weel3 Weel4)
 	if(mesh_vertex_count EQUAL 0 OR mesh_face_count EQUAL 0)
 		message(FATAL_ERROR "No vertices or faces found in ${path}")
 	endif()
+	if(mesh STREQUAL "Car")
+		set(body_face_count "${mesh_face_count}")
+	endif()
 endforeach()
 
 if(face_count EQUAL 0 OR vertex_count GREATER 65535)
@@ -133,5 +136,6 @@ file(WRITE "${OUTPUT}"
 	"static const SVECTOR car_vertices[] = {\n${vertices}};\n"
 	"static const SVECTOR car_normals[] = {\n${normals}};\n"
 	"static const ModelFace car_faces[] = {\n${faces}};\n"
+	"#define CAR_BODY_FACE_COUNT ${body_face_count}\n"
 	"#define CAR_FACE_COUNT ${face_count}\n"
 )
