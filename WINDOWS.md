@@ -39,6 +39,8 @@ tallennustilan, käynnistä uusi käännös valitsemalla **System > Restart Game
 Nuoli ylös kiihdyttää eteenpäin ja nuoli alas jarruttaa ja peruuttaa.
 Vapautettaessa kaasun auto hidastuu vähitellen pysähdyksiin. Nuolilla vasemmalle
 ja oikealle käännetään ajon aikana; peruuttaessa ohjaus kääntyy päinvastaiseksi.
+Autossa kuuluu nopeuden mukaan muuttuva moottoriääni ja peruutusmerkkiääni.
+Äänenvoimakkuutta voi säätää DuckStationin ääniasetuksissa.
 Kamera seuraa auton takaa. Tie muodostetaan ajon aikana, mutkittelee
 satunnaisesti ja jatkuu eteenpäin; myös peruuttaminen on mahdollista.
 Tie pysyy samana, kun palaat aiempaan kohtaan. DuckStationissa näppäimistön nuolet on
