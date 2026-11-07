@@ -13,6 +13,24 @@
 			"launchCompleteCommand": "exec-continue",
 			"stopAtEntry": false,
 			"preLaunchTask": "Start PS1 game for debugging"
+		},
+		{
+			"name": "PS1: Run and Debug in DuckStation (Windows)",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/windows/hello.elf",
+			"cwd": "${workspaceFolder}",
+			"miDebuggerPath": "${env:PSN00BSDK_GDB}",
+			"miDebuggerServerAddress": "127.0.0.1:2345",
+			"MIMode": "gdb",
+			"setupCommands": [
+				{
+					"text": "set architecture mips:3000"
+				}
+			],
+			"launchCompleteCommand": "exec-continue",
+			"stopAtEntry": false,
+			"preLaunchTask": "Start PS1 game for debugging (Windows)"
 		}
 	]
 }

@@ -21,6 +21,38 @@
 				"panel": "dedicated"
 			},
 			"problemMatcher": []
+		},
+		{
+			"label": "Build PS1 game (Windows)",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/build.ps1"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Start PS1 game for debugging (Windows)",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/.vscode/start-debug.ps1"
+			],
+			"dependsOn": "Build PS1 game (Windows)",
+			"dependsOrder": "sequence",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"problemMatcher": []
 		}
 	]
 }

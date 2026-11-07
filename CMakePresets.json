@@ -21,6 +21,28 @@
 			"warnings": {
 				"dev": false
 			}
+		},
+		{
+			"name": "windows",
+			"displayName": "PlayStation 1 (Windows)",
+			"description": "Build with PSn00bSDK on Windows.",
+			"generator": "Ninja",
+			"toolchainFile": "$env{PSN00BSDK_LIBS}/cmake/sdk.cmake",
+			"binaryDir": "${sourceDir}/build/windows",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"PSN00BSDK_TC": "",
+				"PSN00BSDK_TARGET": "mipsel-none-elf"
+			},
+			"warnings": {
+				"dev": false
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "windows",
+			"configurePreset": "windows"
 		}
 	]
 }

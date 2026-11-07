@@ -1,0 +1,36 @@
+# Windows-kehitys
+
+Varmista, että koneessa on `winget`. Avaa PowerShell projektikansiossa. Jos
+PowerShell estää paikallisten skriptien suorittamisen, salli ne vain nykyisessä
+PowerShell-istunnossa:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+Asenna PSn00bSDK ja tarvittaessa CMake, käännä peli ja käynnistä levykuva
+DuckStationissa:
+
+```powershell
+.\setup.ps1
+.\build.ps1
+.\run.ps1
+```
+
+VS Coden **Run and Debug** -näkymässä valitse
+**PS1: Run and Debug in DuckStation (Windows)** ja paina F5. `setup.ps1`
+asentaa kääntäjän mutta ei debuggeria. Asenna Windowsille MIPS-arkkitehtuuria
+ja GDB:n remote target-description XML:ää tukeva `gdb-multiarch`, aseta
+`PSN00BSDK_GDB` osoittamaan sen suoritettavaan tiedostoon ja käynnistä VS Code
+uudelleen. Tavallinen x64-GDB ei riitä. Varmista DuckStationin asetuksista,
+että **Settings > Debugging > Enable GDB Server** on päällä ja portti on
+`2345`. DuckStationin voi tarvittaessa asettaa `DUCKSTATION`-ympäristömuuttujalla.
+
+Käännöksen tulokset ovat `build\windows\`-hakemistossa. Käynnistys käyttää
+oletuksena DuckStationia polusta
+`E:\duckstation\duckstation-qt-x64-ReleaseLTCG.exe`. Jos DuckStation on
+asennettu muualle, anna suoritettavan tiedoston polku:
+
+```powershell
+.\run.ps1 -DuckStationExe 'C:\duckstation\DuckStation.exe'
+```
