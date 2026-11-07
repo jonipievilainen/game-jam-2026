@@ -1,9 +1,12 @@
 param(
-	[string]$DuckStationExe = 'E:\duckstation\duckstation-qt-x64-ReleaseLTCG.exe'
+	[string]$DuckStationExe = 'E:\duckstation\duckstation-qt-x64-ReleaseLTCG.exe',
+	[Alias('CubeDemo')]
+	[switch]$CarDemo
 )
 
 $ErrorActionPreference = 'Stop'
-$discImage = Join-Path $PSScriptRoot 'build\windows\hello.cue'
+$imageName = if ($CarDemo) { 'cube_demo.cue' } else { 'hello.cue' }
+$discImage = Join-Path $PSScriptRoot "build\windows\$imageName"
 
 if (-not (Test-Path $DuckStationExe)) {
 	throw "DuckStation was not found at '$DuckStationExe'. Pass its executable path with -DuckStationExe."

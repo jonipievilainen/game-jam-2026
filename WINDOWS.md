@@ -17,6 +17,21 @@ DuckStationissa:
 .\run.ps1
 ```
 
+Pyörivän 3D-automallin demo käännetään samalla ja käynnistetään komennolla:
+
+```powershell
+.\run.ps1 -CarDemo
+```
+
+Demo yhdistää `car`-kansion korin ja neljän renkaan OBJ-geometriat ja käyttää
+niiden normaaleja valaistukseen. Geometria muunnetaan automaattisesti
+käännöksen yhteydessä; MTL-materiaalit ja tekstuurikoordinaatit eivät ole
+käytössä. Korille ja renkaille asetetaan erilliset värit. Levykuvan vanha nimi
+säilyy yhteensopivuuden vuoksi: Linuxissa se on `build/cube_demo.cue`, ja
+Windowsissa myös `.\run.ps1 -CubeDemo` toimii.
+Sulje demo DuckStationissa ennen uutta käännöstä, jotta Windows vapauttaa
+levykuvatiedoston kirjoittamista varten.
+
 VS Coden **Run and Debug** -näkymässä valitse
 **PS1: Run and Debug in DuckStation (Windows)** ja paina F5. `setup.ps1`
 asentaa kääntäjän mutta ei debuggeria. Asenna Windowsille MIPS-arkkitehtuuria

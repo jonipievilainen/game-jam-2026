@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<iso_project>
+	<track type="data">
+		<identifiers
+			system="PLAYSTATION"
+			volume="CUBE_DEMO"
+			volume_set="CUBE_DEMO"
+			publisher="HOMEBREW"
+			data_preparer="PSn00bSDK"
+			application="PLAYSTATION"
+			copyright="SYSTEM.CNF;1"
+		/>
+		<directory_tree>
+			<file name="SYSTEM.CNF" type="data" source="${PROJECT_SOURCE_DIR}/cube_system.cnf" />
+			<file name="CUBE.EXE" type="data" source="cube_demo.exe" />
+			<dummy sectors="128" />
+		</directory_tree>
+	</track>
+</iso_project>
